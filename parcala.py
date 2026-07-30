@@ -30,8 +30,9 @@ for bolum in bolumler:
             })
 
 # --- kontrol ---
-print(f"Toplam {len(parcalar)} parça bulundu.\n")
-for i, p in enumerate(parcalar):
-    print(f"--- Parça {i} | {p['bolum']} ---")
-    print(p["metin"])
-    print()
+if __name__ == "__main__":
+    print(f"Toplam {len(parcalar)} parça bulundu.\n")
+    for i, p in enumerate(parcalar):
+        print(f"--- Parça {i} | {p['bolum']} ---")
+        print(p["metin"])
+        print()
