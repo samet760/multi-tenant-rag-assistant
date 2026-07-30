@@ -2,7 +2,7 @@
 
 from pypdf import PdfReader
 
-reader = PdfReader("data/ENGLISH HOME MAĞAZA ÇALIŞMA YÖNETMELİĞİ.pdf")
+reader = PdfReader("data/kurallar.pdf")
 
 metin = ""
 for sayfa in reader.pages:
