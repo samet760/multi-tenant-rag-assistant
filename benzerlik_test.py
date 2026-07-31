@@ -28,6 +28,11 @@ sorular = [
 for soru in sorular:
     soru_v = model.encode(soru, normalize_embeddings=True)
     skorlar = vektorler @ soru_v
-    en_iyi = skorlar.max()
-    en_iyi_i = skorlar.argmax()
-    print(f"{en_iyi:.3f} | {soru:35} | {parcalar[en_iyi_i]['metin'][:100]}")
+
+    sirali = np.argsort(skorlar)[::-1]
+    ilk3 = sirali[:3]
+
+    print(f"\n=== {soru}")
+    for sira, i in enumerate(ilk3, 1):
+        print(f"  {sira}. skor={skorlar[i]:.3f} | {parcalar[i]['bolum']}")
+        print(f"     {parcalar[i]['metin'][:100]}...")
