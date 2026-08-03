@@ -6,13 +6,12 @@ from llm import sor
 
 load_dotenv()
 URL = os.getenv("SUPABASE_DB_URL")
-TENANT = "english-home"
 ESIK = 0.55
 
 model = SentenceTransformer("BAAI/bge-m3")
 
 
-def cevapla(soru):
+def cevapla(soru, tenant_id):
     soru_v = model.encode(soru, normalize_embeddings=True)
     soru_str = str(soru_v.tolist())
 
@@ -26,7 +25,7 @@ def cevapla(soru):
                 order by vektor <=> %s::vector
                 limit 3
                 """,
-                (soru_str, TENANT, soru_str),
+                (soru_str, tenant_id, soru_str),
             )
             satirlar = imlec.fetchall()
 
