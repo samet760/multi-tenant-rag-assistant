@@ -1,28 +1,38 @@
+import argparse
 import os
 import psycopg
-import numpy as np
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
-from parcala import parcalar
+from parcala import parcalar_uret
 
 load_dotenv()
 URL = os.getenv("SUPABASE_DB_URL")
-TENANT = "english-home"
 
-model = SentenceTransformer("BAAI/bge-m3")
-metinler = [p["metin"] for p in parcalar]
-vektorler = model.encode(metinler, normalize_embeddings=True)
 
-with psycopg.connect(URL) as baglanti:
-    with baglanti.cursor() as imlec:
-        imlec.execute("delete from parcalar where tenant_id = %s", (TENANT,))
+def indeksle(tenant, pdf_yolu):
+    parcalar = parcalar_uret(pdf_yolu)
+    model = SentenceTransformer("BAAI/bge-m3")
+    metinler = [p["metin"] for p in parcalar]
+    vektorler = model.encode(metinler, normalize_embeddings=True)
 
-        for p, v in zip(parcalar, vektorler):
-            imlec.execute(
-                "insert into parcalar (tenant_id, bolum, metin, vektor) values (%s, %s, %s, %s)",
-                (TENANT, p["bolum"], p["metin"], str(v.tolist())),
-            )
+    with psycopg.connect(URL) as baglanti:
+        with baglanti.cursor() as imlec:
+            imlec.execute("delete from parcalar where tenant_id = %s", (tenant,))
 
-        baglanti.commit()
+            for p, v in zip(parcalar, vektorler):
+                imlec.execute(
+                    "insert into parcalar (tenant_id, bolum, metin, vektor) values (%s, %s, %s, %s)",
+                    (tenant, p["bolum"], p["metin"], str(v.tolist())),
+                )
 
-print("yazildi:", len(parcalar))
+            baglanti.commit()
+
+    print(f"yazildi: {len(parcalar)} (tenant={tenant}, pdf={pdf_yolu})")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tenant", default="english-home")
+    parser.add_argument("--pdf", default="data/kurallar.pdf")
+    args = parser.parse_args()
+    indeksle(args.tenant, args.pdf)
