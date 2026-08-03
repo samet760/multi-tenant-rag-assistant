@@ -31,11 +31,14 @@ def cevapla(soru, tenant_id):
 
     if not satirlar or satirlar[0][1] < ESIK:
         en_iyi = satirlar[0][1] if satirlar else 0
-        return f"[ESIK {en_iyi:.3f}] Bu bilgi dokümanlarda yer almıyor."
+        return "Bu bilgi dokümanlarda yer almıyor.", en_iyi
 
     secilen = [s[0] for s in satirlar]
-    return sor(soru, secilen)
+    return sor(soru, secilen), satirlar[0][1]
+
+
 
 
 if __name__ == "__main__":
-    print(cevapla("kasa sayımını kim yapar"))
+    cevap, skor = cevapla("kasa sayımını kim yapar", "english-home")
+    print(skor, cevap)

@@ -11,5 +11,5 @@ class SoruIstegi(BaseModel):
 
 @app.post("/sor")
 def sor_endpoint(istek: SoruIstegi):
-    cevap = cevapla(istek.soru, istek.tenant_id)
-    return {"cevap": cevap}
+    cevap, skor = cevapla(istek.soru, istek.tenant_id)
+    return {"cevap": cevap, "skor": skor}

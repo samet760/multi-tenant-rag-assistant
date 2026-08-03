@@ -1,0 +1,27 @@
+﻿@page
+@model arayuz.Pages.IndexModel
+
+<h2>Doküman Asistanı</h2>
+
+<form method="post" id="soru-formu">
+    <div class="mb-3">
+        <input asp-for="Soru" class="form-control" placeholder="Sorunuzu yazın" />
+    </div>
+    <button type="submit" class="btn btn-primary" id="sor-dugmesi">Sor</button>
+</form>
+
+@if (!string.IsNullOrEmpty(Model.Cevap))
+{
+    <div class="alert alert-secondary mt-4">
+        @Model.Cevap
+    </div>
+}
+
+
+<script>
+    document.getElementById("soru-formu").addEventListener("submit", function () {
+        var dugme = document.getElementById("sor-dugmesi");
+        dugme.disabled = true;
+        dugme.textContent = "Bekleyin...";
+    });
+</script>
