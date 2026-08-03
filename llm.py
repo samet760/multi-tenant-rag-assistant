@@ -18,6 +18,7 @@ SISTEM = (
     "4. Do NOT give advice or suggest other sources.\n"
     "5. Do NOT describe what the document contains. Answer or refuse.\n"
     "6. Answer in Turkish, maximum 2 sentences."
+    "7. Do NOT mention article or section numbers. State only the fact itself."
 )
 
 
@@ -43,4 +44,8 @@ def sor(soru, parcalar):
     )
 
     veri = yanit.json()
+
+    if "choices" not in veri:
+        return f"[HATA {yanit.status_code}] {yanit.text[:200]}"
+
     return veri["choices"][0]["message"]["content"]

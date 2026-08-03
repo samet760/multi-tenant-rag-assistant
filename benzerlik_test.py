@@ -16,7 +16,7 @@ sorular = [
     "mağaza kaçta açılıyor",
     "geç kalırsam ne olur",
     "hava nasıl olacak",
-    "python nasıl öğrenilir",
+    "python nasil öğrenilir",
     "en iyi pizza nerede",
     "kedim hasta",
     "dolar kaç lira",
