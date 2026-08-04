@@ -1,6 +1,12 @@
 DotNetEnv.Env.Load("../.env");
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddAuthentication("Cerez")
+    .AddCookie("Cerez", ayar =>
+    {
+        ayar.LoginPath = "/Giris";
+        ayar.AccessDeniedPath = "/Giris";
+    });
 
 // Add services to the container.
 builder.Services.AddRazorPages();
@@ -19,6 +25,7 @@ app.UseHttpsRedirection();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
