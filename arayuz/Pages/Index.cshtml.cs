@@ -11,6 +11,8 @@ public class IndexModel : PageModel
 
     public string Cevap { get; set; } = "";
 
+    public string SorulanSoru { get; set; } = "";
+
     public async Task OnPostAsync()
     {
         var istemci = new HttpClient();
@@ -18,6 +20,8 @@ public class IndexModel : PageModel
         var yanit = await istemci.PostAsJsonAsync("http://127.0.0.1:8000/sor", govde);
         var sonuc = await yanit.Content.ReadFromJsonAsync<SorguYaniti>();
         Cevap = sonuc?.cevap ?? "";
+        SorulanSoru = Soru;
+        
     }
 
     public class SorguYaniti

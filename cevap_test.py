@@ -20,4 +20,4 @@ if __name__ == "__main__":
         sure = round(time.time() - basla, 1)
         print(f"\n[{beklenen}] {soru}")
         print(f"      {cevap}")
-        print(f"      ({sure} sn)")
+        print(f"      ({sure} sn | skor {skor:.3f})")

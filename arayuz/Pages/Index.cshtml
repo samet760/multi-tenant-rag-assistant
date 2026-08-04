@@ -1,7 +1,8 @@
 ﻿@page
 @model arayuz.Pages.IndexModel
-
-<h2>Doküman Asistanı</h2>
+@{
+    ViewData["Title"] = "Sorgu";
+}
 
 <form method="post" id="soru-formu">
     <div class="mb-3">
@@ -12,8 +13,11 @@
 
 @if (!string.IsNullOrEmpty(Model.Cevap))
 {
-    <div class="alert alert-secondary mt-4">
-        @Model.Cevap
+    <div class="mt-4">
+        <div class="text-muted small">@Model.SorulanSoru</div>
+        <div class="alert alert-secondary mt-1">
+            @Model.Cevap
+        </div>
     </div>
 }
 
