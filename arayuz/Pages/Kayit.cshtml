@@ -1,0 +1,31 @@
+@page
+@model arayuz.Pages.KayitModel
+@{
+    ViewData["Title"] = "Kayıt";
+}
+
+<h3>Kullanıcı Kaydı</h3>
+
+<form method="post">
+    <div class="mb-3">
+        <label class="form-label">E-posta</label>
+        <input asp-for="Eposta" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Şifre</label>
+        <input asp-for="SifreMetni" type="password" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Firma</label>
+        <select asp-for="TenantId" class="form-select">
+            <option value="english-home">English Home</option>
+            <option value="test-firma">Test Firma</option>
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Kaydol</button>
+</form>
+
+@if (!string.IsNullOrEmpty(Model.Mesaj))
+{
+    <div class="alert alert-info mt-3">@Model.Mesaj</div>
+}
