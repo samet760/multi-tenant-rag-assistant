@@ -2,8 +2,9 @@ import argparse
 import os
 import psycopg
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
+
 from parcala import parcalar_uret
+from embed import model
 
 load_dotenv()
 URL = os.getenv("SUPABASE_DB_URL")
@@ -11,7 +12,6 @@ URL = os.getenv("SUPABASE_DB_URL")
 
 def indeksle(tenant, pdf_yolu):
     parcalar = parcalar_uret(pdf_yolu)
-    model = SentenceTransformer("BAAI/bge-m3")
     metinler = [p["metin"] for p in parcalar]
     vektorler = model.encode(metinler, normalize_embeddings=True)
 

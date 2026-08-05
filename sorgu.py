@@ -1,14 +1,13 @@
 import os
 import psycopg
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
 from llm import sor
+from embed import model
 
 load_dotenv()
 URL = os.getenv("SUPABASE_DB_URL")
 ESIK = 0.55
 
-model = SentenceTransformer("BAAI/bge-m3")
 
 
 def cevapla(soru, tenant_id):
