@@ -1,8 +1,9 @@
-# servis.py
-from fastapi import FastAPI
+import os
+import tempfile
+from fastapi import FastAPI, UploadFile, File, Form
 from pydantic import BaseModel
 from sorgu import cevapla
-
+from indeksle import indeksle
 app = FastAPI()
 
 class SoruIstegi(BaseModel):
@@ -13,3 +14,16 @@ class SoruIstegi(BaseModel):
 def sor_endpoint(istek: SoruIstegi):
     cevap, skor = cevapla(istek.soru, istek.tenant_id)
     return {"cevap": cevap, "skor": skor}
+
+@app.post("/indeksle")
+def indeksle_endpoint(tenant_id: str = Form(...), dosya: UploadFile = File(...)):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as gecici:
+        gecici.write(dosya.file.read())
+        yol = gecici.name
+
+    try:
+        indeksle(tenant_id, yol, dosya.filename)
+    finally:
+        os.remove(yol)
+
+    return {"durum": "tamam"}
