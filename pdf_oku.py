@@ -1,19 +1,14 @@
-
-
+import re
 from pypdf import PdfReader
 
-reader = PdfReader("data/kurallar.pdf")
 
-metin = ""
-for sayfa in reader.pages:
-    metin += sayfa.extract_text()
+def pdf_oku(pdf_yolu):
+    reader = PdfReader(pdf_yolu)
 
-# --- temizleme ---
-# alt satıra geçişleri boşluğa çevir
-metin = metin.replace("\n", " ")
-# birden fazla boşluğu tek boşluğa indir
-import re
-metin = re.sub(r"\s+", " ", metin)
-metin = metin.strip()
+    metin = ""
+    for sayfa in reader.pages:
+        metin += sayfa.extract_text()
 
-print(metin[:500])
+    metin = metin.replace("\n", " ")
+    metin = re.sub(r"\s+", " ", metin)
+    return metin.strip()
