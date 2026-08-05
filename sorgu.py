@@ -6,7 +6,7 @@ from embed import model
 
 load_dotenv()
 URL = os.getenv("SUPABASE_DB_URL")
-ESIK = 0.55
+ESIK = 0.54
 
 
 
