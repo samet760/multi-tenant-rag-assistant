@@ -2,32 +2,35 @@ import argparse
 import os
 import psycopg
 from dotenv import load_dotenv
-
-from parcala import parcalar_uret
 from embed import model
+from parcala import parcalar_uret
 
 load_dotenv()
 URL = os.getenv("SUPABASE_DB_URL")
 
 
-def indeksle(tenant, pdf_yolu):
+def indeksle(tenant, pdf_yolu, dosya_adi):
     parcalar = parcalar_uret(pdf_yolu)
     metinler = [p["metin"] for p in parcalar]
     vektorler = model.encode(metinler, normalize_embeddings=True)
 
     with psycopg.connect(URL) as baglanti:
         with baglanti.cursor() as imlec:
-            imlec.execute("delete from parcalar where tenant_id = %s", (tenant,))
+            imlec.execute(
+                "insert into belgeler (tenant_id, dosya_adi) values (%s, %s) returning id",
+                (tenant, dosya_adi),
+            )
+            belge_id = imlec.fetchone()[0]
 
             for p, v in zip(parcalar, vektorler):
                 imlec.execute(
-                    "insert into parcalar (tenant_id, bolum, metin, vektor) values (%s, %s, %s, %s)",
-                    (tenant, p["bolum"], p["metin"], str(v.tolist())),
+                    "insert into parcalar (tenant_id, bolum, metin, vektor, belge_id) values (%s, %s, %s, %s, %s)",
+                    (tenant, p["bolum"], p["metin"], str(v.tolist()), belge_id),
                 )
 
             baglanti.commit()
 
-    print(f"yazildi: {len(parcalar)} (tenant={tenant}, pdf={pdf_yolu})")
+    print(f"yazildi: {len(parcalar)} (tenant={tenant}, belge_id={belge_id}, dosya={dosya_adi})")
 
 
 if __name__ == "__main__":
@@ -35,4 +38,4 @@ if __name__ == "__main__":
     parser.add_argument("--tenant", default="english-home")
     parser.add_argument("--pdf", default="data/kurallar.pdf")
     args = parser.parse_args()
-    indeksle(args.tenant, args.pdf)
+    indeksle(args.tenant, args.pdf, os.path.basename(args.pdf))
