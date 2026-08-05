@@ -1,0 +1,50 @@
+@page
+@model arayuz.Pages.BelgelerModel
+@{
+    ViewData["Title"] = "Belgelerim";
+}
+
+<h2>Belgelerim</h2>
+
+@if (Model.Liste.Count == 0)
+{
+    <p>Henüz belge yüklenmemiş. <a href="/Yukle">Belge yükle</a></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Dosya</th>
+                <th>Yükleme</th>
+                <th>Parça</th>
+                @if (User.IsInRole("yonetici"))
+                {
+                    <th></th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var belge in Model.Liste)
+            {
+                <tr>
+                    <td>@belge.DosyaAdi</td>
+                    <td>@belge.Tarih.ToString("dd.MM.yyyy HH:mm")</td>
+                    <td>@belge.ParcaSayisi</td>
+                    @if (User.IsInRole("yonetici"))
+                    {
+                        <td>
+                            <form method="post" asp-page-handler="Sil">
+                                <input type="hidden" name="id" value="@belge.Id" />
+                                <button type="submit" class="btn btn-sm btn-danger"
+                                        onclick="return confirm('@belge.DosyaAdi silinsin mi?');">
+                                    Sil
+                                </button>
+                            </form>
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}

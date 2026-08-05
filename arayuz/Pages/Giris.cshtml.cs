@@ -21,10 +21,16 @@ public class GirisModel : PageModel
     {
         string? ozet = null;
         string? tenantId = null;
+        string? rol = null;
+        string? firmaAdi = null;
+        string? logoUrl = null;
 
         using (var baglanti = Db.Baglan())
         using (var komut = new NpgsqlCommand(
-            "select sifre_ozeti, tenant_id from kullanicilar where eposta = @e", baglanti))
+            @"select k.sifre_ozeti, k.tenant_id, k.rol, t.ad, t.logo_url
+              from kullanicilar k
+              join tenantlar t on t.id = k.tenant_id
+              where k.eposta = @e", baglanti))
         {
             komut.Parameters.AddWithValue("e", Eposta);
             using var okuyucu = komut.ExecuteReader();
@@ -32,6 +38,9 @@ public class GirisModel : PageModel
             {
                 ozet = okuyucu.GetString(0);
                 tenantId = okuyucu.GetString(1);
+                rol = okuyucu.GetString(2);
+                firmaAdi = okuyucu.GetString(3);
+                logoUrl = okuyucu.IsDBNull(4) ? null : okuyucu.GetString(4);
             }
         }
 
@@ -44,10 +53,17 @@ public class GirisModel : PageModel
         var claimler = new List<Claim>
         {
             new Claim(ClaimTypes.Name, Eposta),
-            new Claim("tenant_id", tenantId!)
+            new Claim("tenant_id", tenantId!),
+            new Claim(ClaimTypes.Role, rol!),
+            new Claim("firma_adi", firmaAdi!)
         };
 
-        var kimlik = new ClaimsIdentity(claimler, "Cerez");
+        if (logoUrl != null)
+        {
+            claimler.Add(new Claim("logo_url", logoUrl));
+        }
+
+        var kimlik = new ClaimsIdentity(claimler, "Cerez", ClaimTypes.Name, ClaimTypes.Role);
         await HttpContext.SignInAsync("Cerez", new ClaimsPrincipal(kimlik));
 
         return RedirectToPage("/Index");

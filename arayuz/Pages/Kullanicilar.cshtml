@@ -1,0 +1,54 @@
+@page
+@model arayuz.Pages.KullanicilarModel
+@{
+    ViewData["Title"] = "Kullanıcılar";
+}
+
+<h2>Kullanıcılar</h2>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>E-posta</th>
+            <th>Rol</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var k in Model.Liste)
+        {
+            <tr>
+                <td>@k.Eposta</td>
+                <td>
+                    @k.Rol
+                    @if (k.Eposta == Model.SahipEposta)
+                    {
+                        <span class="text-muted">(sahip)</span>
+                    }
+                </td>
+                <td>
+                    @if (User.Identity!.Name == k.Eposta)
+                    {
+                        <span>(siz)</span>
+                    }
+                    else if (k.Rol == "kullanici")
+                    {
+                        <form method="post" asp-page-handler="Yukselt">
+                            <input type="hidden" name="id" value="@k.Id" />
+                            <button type="submit" class="btn btn-sm btn-primary">Yönetici yap</button>
+                        </form>
+                    }
+                    else if (k.Rol == "yonetici" && Model.Sahip)
+                    {
+                        <form method="post" asp-page-handler="Dusur">
+                            <input type="hidden" name="id" value="@k.Id" />
+                            <button type="submit" class="btn btn-sm btn-warning">Yetkiyi al</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<p class="text-muted small">Rol değişikliği kullanıcı yeniden giriş yaptığında geçerli olur.</p>

@@ -1,0 +1,24 @@
+@page
+@model arayuz.Pages.LogoModel
+@{
+    ViewData["Title"] = "Logo";
+}
+
+<h3>Logo</h3>
+
+@if (!string.IsNullOrEmpty(Model.MevcutLogo))
+{
+    <img src="@Model.MevcutLogo" style="max-height:80px" class="mb-3" />
+}
+
+<form method="post" enctype="multipart/form-data">
+    <div class="mb-3">
+        <input asp-for="Dosya" type="file" class="form-control" />
+    </div>
+    <button type="submit" class="btn btn-primary">Yükle</button>
+</form>
+
+@if (Model.Mesaj != null)
+{
+    <div class="alert alert-info mt-3">@Model.Mesaj</div>
+}

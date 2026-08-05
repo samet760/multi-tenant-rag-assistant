@@ -13,7 +13,24 @@
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container">
-                <a class="navbar-brand" asp-area="" asp-page="/Index">Doküman Asistanı</a>
+                @{
+                    var logoUrl = User.FindFirst("logo_url")?.Value;
+                    var firmaAdi = User.FindFirst("firma_adi")?.Value;
+                }
+                <a class="navbar-brand" asp-area="" asp-page="/Index">
+                    @if (User.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(logoUrl))
+                    {
+                        <img src="@logoUrl" style="max-height:32px" />
+                    }
+                    else if (User.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(firmaAdi))
+                    {
+                        @firmaAdi
+                    }
+                    else
+                    {
+                        @:Doküman Asistanı
+                    }
+                </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -25,8 +42,20 @@
         <li class="nav-item">
             <span class="nav-link text-dark">@User.Identity.Name</span>
         </li>
+        @if (User.IsInRole("yonetici"))
+        {
+            <li class="nav-item">
+                <a class="nav-link text-dark" asp-page="/Yukle">Belge Yükle</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link text-dark" asp-page="/Kullanicilar">Kullanıcılar</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link text-dark" asp-page="/Logo">Logo</a>
+            </li>
+        }
         <li class="nav-item">
-            <a class="nav-link text-dark" asp-page="/Yukle">Belge Yükle</a>
+            <a class="nav-link text-dark" asp-page="/Belgeler">Belgelerim</a>
         </li>
         <li class="nav-item">
             <a class="nav-link text-dark" asp-page="/Cikis">Çıkış</a>

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace arayuz.Pages;
 
-[Authorize]
+[Authorize(Roles = "yonetici")]
 public class YukleModel : PageModel
 {
     [BindProperty]

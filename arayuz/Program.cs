@@ -5,7 +5,7 @@ builder.Services.AddAuthentication("Cerez")
     .AddCookie("Cerez", ayar =>
     {
         ayar.LoginPath = "/Giris";
-        ayar.AccessDeniedPath = "/Giris";
+        ayar.AccessDeniedPath = "/Yetkisiz";
     });
 
 // Add services to the container.
