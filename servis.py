@@ -16,13 +16,17 @@ def sor_endpoint(istek: SoruIstegi):
     return {"cevap": cevap, "skor": skor}
 
 @app.post("/indeksle")
-def indeksle_endpoint(tenant_id: str = Form(...), dosya: UploadFile = File(...)):
+def indeksle_endpoint(
+    tenant_id: str = Form(...),
+    dosya_adi: str = Form(...),
+    dosya: UploadFile = File(...),
+):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as gecici:
         gecici.write(dosya.file.read())
         yol = gecici.name
 
     try:
-        indeksle(tenant_id, yol, dosya.filename)
+        indeksle(tenant_id, yol, dosya_adi)
     finally:
         os.remove(yol)
 

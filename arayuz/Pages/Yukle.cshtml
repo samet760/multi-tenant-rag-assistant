@@ -1,0 +1,20 @@
+@page
+@model arayuz.Pages.YukleModel
+@{
+    ViewData["Title"] = "Belge Yükle";
+}
+
+<h3>Belge Yükle</h3>
+
+<form method="post" enctype="multipart/form-data">
+    <div class="mb-3">
+        <label class="form-label">Dosya</label>
+        <input type="file" asp-for="Dosya" class="form-control" />
+    </div>
+    <button type="submit" class="btn btn-primary">Yükle</button>
+</form>
+
+@if (Model.Mesaj != null)
+{
+    <div class="alert alert-info mt-3">@Model.Mesaj</div>
+}
