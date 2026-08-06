@@ -19,35 +19,9 @@ public class IndexModel : PageModel
     public record Mesaj(string Rol, string Metin, double? Skor);
     public List<Mesaj> Mesajlar { get; set; } = new();
 
-    public record SohbetOzet(long Id, string Baslik);
-    public List<SohbetOzet> Sohbetler { get; set; } = new();
-
     public void OnGet()
     {
-        SohbetleriYukle();
         MesajlariYukle();
-    }
-
-    private void SohbetleriYukle()
-    {
-        var tenant = User.FindFirst("tenant_id")!.Value;
-        var eposta = User.Identity!.Name;
-
-        const string SQL = @"
-            select id, baslik from sohbetler
-            where tenant_id = @t and eposta = @e
-            order by olusturma_tarihi desc limit 20";
-
-        using var baglanti = Db.Baglan();
-        using var komut = new NpgsqlCommand(SQL, baglanti);
-        komut.Parameters.AddWithValue("t", tenant);
-        komut.Parameters.AddWithValue("e", eposta!);
-
-        using var okuyucu = komut.ExecuteReader();
-        while (okuyucu.Read())
-        {
-            Sohbetler.Add(new SohbetOzet(okuyucu.GetInt64(0), okuyucu.GetString(1)));
-        }
     }
 
     private void MesajlariYukle()

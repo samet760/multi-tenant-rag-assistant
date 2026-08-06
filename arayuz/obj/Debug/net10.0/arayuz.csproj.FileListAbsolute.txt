@@ -21,7 +21,6 @@ C:\Users\samed\english-home-bot\arayuz\obj\Debug\net10.0\rjsmcshtml.dswa.cache.j
 C:\Users\samed\english-home-bot\arayuz\obj\Debug\net10.0\scopedcss\Pages\Shared\_Layout.cshtml.rz.scp.css
 C:\Users\samed\english-home-bot\arayuz\obj\Debug\net10.0\scopedcss\bundle\arayuz.styles.css
 C:\Users\samed\english-home-bot\arayuz\obj\Debug\net10.0\scopedcss\projectbundle\arayuz.bundle.scp.css
-C:\Users\samed\english-home-bot\arayuz\obj\Debug\net10.0\compressed\ns5xeasgum-{0}-b9sayid5wm-b9sayid5wm.gz
 C:\Users\samed\english-home-bot\arayuz\obj\Debug\net10.0\compressed\8vvqrxsik8-{0}-61n19gt1b8-61n19gt1b8.gz
 C:\Users\samed\english-home-bot\arayuz\obj\Debug\net10.0\compressed\f4t1d6128m-{0}-xtxxf3hu2r-xtxxf3hu2r.gz
 C:\Users\samed\english-home-bot\arayuz\obj\Debug\net10.0\compressed\rlwc2cirej-{0}-bqjiyaj88i-bqjiyaj88i.gz
@@ -101,3 +100,4 @@ C:\Users\samed\english-home-bot\arayuz\bin\Debug\net10.0\Superpower.dll
 C:\Users\samed\english-home-bot\arayuz\obj\Debug\net10.0\arayuz.csproj.AssemblyReference.cache
 C:\Users\samed\english-home-bot\arayuz\obj\Debug\net10.0\arayuz.csproj.Up2Date
 C:\Users\samed\english-home-bot\arayuz\obj\Debug\net10.0\compressed\fdzx9l6p21-{0}-mmu7retruk-mmu7retruk.gz
+C:\Users\samed\english-home-bot\arayuz\obj\Debug\net10.0\compressed\ns5xeasgum-{0}-su4n4czzky-su4n4czzky.gz

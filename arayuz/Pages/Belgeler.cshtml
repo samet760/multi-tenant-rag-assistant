@@ -2,75 +2,96 @@
 @model arayuz.Pages.BelgelerModel
 @{
     ViewData["Title"] = "Belgelerim";
+    ViewData["TamGenislik"] = true;
 }
 
-<h2>Belgelerim</h2>
-
-<form method="get" class="input-group mb-3" style="max-width:400px">
-    <input asp-for="Ara" class="form-control" placeholder="Dosya adına göre ara" />
-    <button type="submit" class="btn btn-outline-primary">Ara</button>
-</form>
-
-@if (!string.IsNullOrEmpty(Model.Ara))
-{
-    <p><a href="/Belgeler">Temizle</a></p>
-}
-
-@if (Model.Liste.Count == 0)
-{
-    if (string.IsNullOrEmpty(Model.Ara))
-    {
-        <p>Henüz belge yüklenmemiş. <a href="/Yukle">Belge yükle</a></p>
+<style>
+    .belge-baglantisi {
+        color: var(--bs-body-color);
+        text-decoration: none;
     }
-    else
-    {
-        <p>Eşleşen belge bulunamadı.</p>
+
+    .belge-baglantisi:hover {
+        text-decoration: underline;
     }
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Dosya</th>
-                <th>Yükleme</th>
-                <th>Parça</th>
-                @if (User.IsInRole("yonetici"))
-                {
-                    <th></th>
-                }
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var belge in Model.Liste)
+</style>
+
+<div class="d-flex" style="height:100%;">
+    <div class="border-end" style="width:260px;">
+        <div class="p-3 h-100">
+            @await Component.InvokeAsync("SohbetPaneli")
+        </div>
+    </div>
+    <div class="flex-grow-1 ps-3" style="overflow-y:auto; min-width:0;">
+        <h2>Belgelerim</h2>
+
+        <form method="get" class="input-group mb-3" style="max-width:400px">
+            <input asp-for="Ara" class="form-control" placeholder="Dosya adına göre ara" />
+            <button type="submit" class="btn btn-outline-primary">Ara</button>
+        </form>
+
+        @if (!string.IsNullOrEmpty(Model.Ara))
+        {
+            <p><a href="/Belgeler">Temizle</a></p>
+        }
+
+        @if (Model.Liste.Count == 0)
+        {
+            if (string.IsNullOrEmpty(Model.Ara))
             {
-                <tr>
-                    <td>
-                        @if (!string.IsNullOrEmpty(belge.DosyaYolu))
-                        {
-                            <a href="/BelgeIndir?id=@belge.Id" target="_blank">@belge.DosyaAdi</a>
-                        }
-                        else
-                        {
-                            @belge.DosyaAdi
-                        }
-                    </td>
-                    <td>@belge.Tarih.ToString("dd.MM.yyyy HH:mm")</td>
-                    <td>@belge.ParcaSayisi</td>
-                    @if (User.IsInRole("yonetici"))
-                    {
-                        <td>
-                            <form method="post" asp-page-handler="Sil">
-                                <input type="hidden" name="id" value="@belge.Id" />
-                                <button type="submit" class="btn btn-sm btn-danger"
-                                        onclick="return confirm('@belge.DosyaAdi silinsin mi?');">
-                                    Sil
-                                </button>
-                            </form>
-                        </td>
-                    }
-                </tr>
+                <p>Henüz belge yüklenmemiş. <a href="/Yukle">Belge yükle</a></p>
             }
-        </tbody>
-    </table>
-}
+            else
+            {
+                <p>Eşleşen belge bulunamadı.</p>
+            }
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Dosya</th>
+                        <th>Yükleme</th>
+                        <th>Parça</th>
+                        @if (User.IsInRole("yonetici"))
+                        {
+                            <th></th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var belge in Model.Liste)
+                    {
+                        <tr>
+                            <td>
+                                @if (!string.IsNullOrEmpty(belge.DosyaYolu))
+                                {
+                                    <a href="/BelgeIndir?id=@belge.Id" target="_blank" class="belge-baglantisi">@belge.DosyaAdi</a>
+                                }
+                                else
+                                {
+                                    @belge.DosyaAdi
+                                }
+                            </td>
+                            <td>@belge.Tarih.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>@belge.ParcaSayisi</td>
+                            @if (User.IsInRole("yonetici"))
+                            {
+                                <td>
+                                    <form method="post" asp-page-handler="Sil">
+                                        <input type="hidden" name="id" value="@belge.Id" />
+                                        <button type="submit" class="btn btn-sm btn-danger"
+                                                onclick="return confirm('@belge.DosyaAdi silinsin mi?');">
+                                            Sil
+                                        </button>
+                                    </form>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>

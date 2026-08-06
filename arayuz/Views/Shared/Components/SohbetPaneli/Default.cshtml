@@ -1,0 +1,99 @@
+@model IEnumerable<arayuz.ViewComponents.SohbetOzet>
+
+@{
+    var sohbetId = ViewContext.HttpContext.Request.Query["sohbetId"].ToString();
+}
+
+<style>
+    .sohbet-paneli {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .yeni-sohbet-dugmesi {
+        border-radius: 999px;
+    }
+
+    .yeni-sohbet-dugmesi .yeni-sohbet-metni {
+        display: none;
+        margin-left: 4px;
+    }
+
+    .yeni-sohbet-dugmesi:hover .yeni-sohbet-metni {
+        display: inline;
+    }
+
+    .sohbet-paneli-baslik {
+        font-size: 0.75rem;
+        color: var(--bs-secondary-color);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .sohbet-paneli-listesi {
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    .sohbet-satiri {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.25rem;
+        border-radius: 0.5rem;
+        color: var(--bs-body-color);
+        text-decoration: none;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .sohbet-satiri:hover {
+        background-color: var(--bs-tertiary-bg);
+        color: var(--bs-body-color);
+    }
+
+    .sohbet-satiri.active {
+        background-color: var(--bs-secondary-bg);
+        color: var(--bs-body-color);
+    }
+
+    .sohbet-satiri i {
+        flex-shrink: 0;
+        color: var(--bs-secondary-color);
+    }
+
+    .sohbet-satiri span {
+        min-width: 0;
+    }
+
+    .sohbet-paneli-kullanici {
+        margin-top: auto;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--bs-border-color);
+        font-size: 0.85rem;
+        color: var(--bs-secondary-color);
+    }
+</style>
+
+<div class="sohbet-paneli">
+    <a asp-page="/Index" class="btn btn-sm btn-outline-primary w-100 mb-3 yeni-sohbet-dugmesi">
+        <span>+</span>
+        <span class="yeni-sohbet-metni">Yeni sohbet</span>
+    </a>
+
+    <div class="sohbet-paneli-baslik mb-2">Son sohbetler</div>
+
+    <div class="sohbet-paneli-listesi flex-grow-1">
+        @foreach (var s in Model)
+        {
+            <a asp-page="/Index" asp-route-sohbetId="@s.Id"
+               class="sohbet-satiri @(sohbetId == s.Id.ToString() ? "active" : "")">
+                <i class="bi bi-chat"></i>
+                <span class="text-truncate">@s.Baslik</span>
+            </a>
+        }
+    </div>
+
+    <div class="sohbet-paneli-kullanici text-truncate">@User.Identity!.Name</div>
+</div>

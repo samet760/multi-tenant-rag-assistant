@@ -3,20 +3,13 @@
 
 @{
     ViewData["Title"] = "Sorgu";
+    ViewData["TamGenislik"] = true;
 }
 
 <style>
-    .yeni-sohbet-dugmesi .yeni-sohbet-metni {
-        display: none;
-        margin-left: 4px;
-    }
-
-    .yeni-sohbet-dugmesi:hover .yeni-sohbet-metni {
-        display: inline;
-    }
-
     .chat-balon {
-        border-radius: 1rem;
+        border-radius: 1.25rem;
+        padding: 1rem 1.4rem;
     }
 
     .yaziyor-balonu .nokta {
@@ -24,6 +17,8 @@
         font-size: 1.5rem;
         line-height: 0;
         animation: noktaYanipSon 1.4s infinite ease-in-out both;
+        position: relative;
+        z-index: 1;
     }
 
     .yaziyor-balonu .nokta:nth-child(1) {
@@ -43,48 +38,231 @@
             opacity: 1;
         }
     }
+
+    .yaziyor-balonu {
+        position: relative;
+        z-index: 0;
+        overflow: visible;
+    }
+
+    .soru-formu-girdi {
+        border-radius: 999px;
+        padding: 0.75rem 1.25rem;
+    }
+
+    .soru-formu-dugme {
+        border-radius: 999px;
+        padding: 0.75rem 1.5rem;
+    }
+
+    #mesajKutusu {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        position: relative;
+        z-index: 0;
+        scrollbar-width: thin;
+        scrollbar-color: var(--bs-secondary-color) transparent;
+    }
+
+    .mesaj-satiri {
+        width: 100%;
+        max-width: 800px;
+    }
+
+    .balon-soru {
+        background-color: var(--bs-secondary-bg);
+        color: var(--bs-body-color);
+    }
+
+    .balon-cevap {
+        background-color: var(--bs-tertiary-bg);
+        color: var(--bs-body-color);
+        border: 1px solid var(--bs-border-color);
+    }
+
+    #parlama {
+        --parlama-1: #93c5fd;
+        --parlama-2: #c4b5fd;
+        --parlama-3: #bfdbfe;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 240px;
+        height: 240px;
+        pointer-events: none;
+        z-index: -1;
+        filter: blur(30px);
+        opacity: 0.75;
+        transform: translate(-50%, -50%);
+        animation: parlamaSalinim 19s ease-in-out infinite;
+        transition: top 1s ease, left 1s ease, right 1s ease, bottom 1s ease,
+                    width 1s ease, height 1s ease, filter 1s ease, opacity 1s ease;
+    }
+
+    [data-bs-theme="dark"] #parlama {
+        --parlama-1: #1e3a8a;
+        --parlama-2: #4c1d95;
+        --parlama-3: #6d28d9;
+    }
+
+    .parlama-katman {
+        position: absolute;
+    }
+
+    .parlama-katman-1 {
+        inset: 8% 38% 32% 6%;
+        background: var(--parlama-1);
+        border-radius: 58% 42% 65% 35% / 45% 55% 40% 60%;
+        transform: translate(-10%, -6%) scale(1);
+        animation: parlamaKatman1 7s ease-in-out infinite;
+    }
+
+    .parlama-katman-2 {
+        inset: 28% 6% 10% 32%;
+        background: var(--parlama-2);
+        border-radius: 42% 58% 40% 60% / 55% 45% 60% 40%;
+        transform: translate(10%, 6%) rotate(0deg);
+        animation: parlamaKatman2 11s ease-in-out infinite;
+    }
+
+    .parlama-katman-3 {
+        inset: 18% 20% 16% 22%;
+        background: var(--parlama-3);
+        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+        transform: translate(-4%, 8%) scale(0.9);
+        animation: parlamaKatman3 13s ease-in-out infinite;
+    }
+
+    #parlama.parlama-balonda {
+        inset: -30%;
+        top: auto;
+        left: auto;
+        width: auto;
+        height: auto;
+        filter: blur(12px);
+        opacity: 0.85;
+        animation: parlamaSalinimKucuk 8s ease-in-out infinite;
+    }
+
+    .parlama-balonda .parlama-katman-1 {
+        animation-duration: 3s;
+    }
+
+    .parlama-balonda .parlama-katman-2 {
+        animation-duration: 4s;
+    }
+
+    .parlama-balonda .parlama-katman-3 {
+        animation-duration: 5s;
+    }
+
+    @@keyframes parlamaKatman1 {
+        0%, 100% {
+            transform: translate(-10%, -6%) scale(1);
+        }
+
+        50% {
+            transform: translate(12%, 10%) scale(1.25);
+        }
+    }
+
+    @@keyframes parlamaKatman2 {
+        0%, 100% {
+            transform: translate(10%, 6%) rotate(0deg);
+        }
+
+        50% {
+            transform: translate(-14%, -10%) rotate(150deg);
+        }
+    }
+
+    @@keyframes parlamaKatman3 {
+        0%, 100% {
+            transform: translate(-4%, 8%) scale(0.9);
+            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+        }
+
+        50% {
+            transform: translate(-4%, 8%) scale(1.2);
+            border-radius: 35% 65% 65% 35% / 40% 40% 60% 60%;
+        }
+    }
+
+    @@keyframes parlamaSalinim {
+        0%, 100% {
+            transform: translate(-50%, -50%) rotate(-4deg);
+        }
+
+        50% {
+            transform: translate(-50%, -50%) rotate(4deg);
+        }
+    }
+
+    @@keyframes parlamaSalinimKucuk {
+        0%, 100% {
+            transform: rotate(-6deg);
+        }
+
+        50% {
+            transform: rotate(6deg);
+        }
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        #parlama,
+        #parlama.parlama-balonda,
+        .parlama-katman-1,
+        .parlama-katman-2,
+        .parlama-katman-3,
+        .parlama-balonda .parlama-katman-1,
+        .parlama-balonda .parlama-katman-2,
+        .parlama-balonda .parlama-katman-3 {
+            animation: none;
+        }
+    }
 </style>
 
-<div class="row">
-    <div class="col-3">
-        <a asp-page="/Index" class="btn btn-sm btn-outline-primary w-100 mb-3 yeni-sohbet-dugmesi">
-            <span>+</span>
-            <span class="yeni-sohbet-metni">Yeni sohbet</span>
-        </a>
-        <div class="list-group">
-            @foreach (var s in Model.Sohbetler)
-            {
-                <a asp-page="/Index" asp-route-sohbetId="@s.Id"
-                   class="list-group-item list-group-item-action text-truncate @(Model.SohbetId == s.Id ? "active" : "")">
-                    @s.Baslik
-                </a>
-            }
+<div class="d-flex" style="height:100%;">
+    <div class="border-end" style="width:260px;">
+        <div class="p-3 h-100">
+            @await Component.InvokeAsync("SohbetPaneli")
         </div>
     </div>
-
-    <div class="col-9">
-        <div id="mesajKutusu" class="mb-3" style="height:60vh; overflow-y:auto">
+    <div class="flex-grow-1 ps-3 d-flex flex-column" style="min-width:0;">
+        <div id="mesajKutusu" class="mb-4">
+            @if (Model.Mesajlar.Count == 0)
+            {
+                <div id="parlama">
+                    <div class="parlama-katman parlama-katman-1"></div>
+                    <div class="parlama-katman parlama-katman-2"></div>
+                    <div class="parlama-katman parlama-katman-3"></div>
+                </div>
+            }
             @foreach (var m in Model.Mesajlar)
             {
                 if (m.Rol == "soru")
                 {
-                    <div class="d-flex justify-content-end mb-2">
-                        <div class="alert alert-primary mb-0 chat-balon" style="max-width:70%;">@m.Metin</div>
+                    <div class="d-flex justify-content-end mb-3 mesaj-satiri">
+                        <div class="alert mb-0 chat-balon balon-soru" style="max-width:70%;">@m.Metin</div>
                     </div>
                 }
                 else
                 {
-                    <div class="d-flex justify-content-start mb-2">
-                        <div class="alert alert-secondary mb-0 chat-balon" style="max-width:70%;">@m.Metin</div>
+                    <div class="d-flex justify-content-start mb-3 mesaj-satiri">
+                        <div class="alert mb-0 chat-balon balon-cevap" style="max-width:70%;">@m.Metin</div>
                     </div>
                 }
             }
         </div>
 
-        <form method="post" id="soru-formu" class="input-group">
+        <form method="post" id="soru-formu" class="d-flex gap-2 mx-auto mb-5 px-3" style="max-width:800px; width:100%;">
             <input type="hidden" name="SohbetId" value="@Model.SohbetId" />
-            <input asp-for="Soru" class="form-control" placeholder="Sorunuzu yazın" />
-            <button type="submit" class="btn btn-primary" id="sor-dugmesi">Sor</button>
+            <input asp-for="Soru" class="form-control soru-formu-girdi flex-grow-1" placeholder="Sorunuzu yazın" />
+            <button type="submit" class="btn btn-primary soru-formu-dugme" id="sor-dugmesi">Sor</button>
         </form>
     </div>
 </div>
@@ -106,18 +284,29 @@
         var soruMetni = document.getElementById("Soru").value;
 
         var soruBalonu = document.createElement("div");
-        soruBalonu.className = "d-flex justify-content-end mb-2";
-        soruBalonu.innerHTML = '<div class="alert alert-primary mb-0 chat-balon" style="max-width:70%;"></div>';
+        soruBalonu.className = "d-flex justify-content-end mb-3 mesaj-satiri";
+        soruBalonu.innerHTML = '<div class="alert mb-0 chat-balon balon-soru" style="max-width:70%;"></div>';
         soruBalonu.querySelector("div").textContent = soruMetni;
         kutu.appendChild(soruBalonu);
 
+        setTimeout(function () {
+            document.getElementById("Soru").value = "";
+        }, 0);
+
         var yaziyorSatiri = document.createElement("div");
-        yaziyorSatiri.className = "d-flex justify-content-start mb-2 yaziyor-satiri";
+        yaziyorSatiri.className = "d-flex justify-content-start mb-3 yaziyor-satiri mesaj-satiri";
         yaziyorSatiri.innerHTML =
-            '<div class="alert alert-secondary mb-0 chat-balon yaziyor-balonu" style="max-width:70%;">' +
+            '<div class="alert mb-0 chat-balon balon-cevap yaziyor-balonu" style="max-width:70%;">' +
             '<span class="nokta">.</span><span class="nokta">.</span><span class="nokta">.</span>' +
             '</div>';
         kutu.appendChild(yaziyorSatiri);
+
+        var parlama = document.getElementById("parlama");
+        if (parlama) {
+            var yaziyorBalonu = yaziyorSatiri.querySelector(".chat-balon");
+            yaziyorBalonu.appendChild(parlama);
+            parlama.classList.add("parlama-balonda");
+        }
 
         kutu.scrollTop = kutu.scrollHeight;
     });

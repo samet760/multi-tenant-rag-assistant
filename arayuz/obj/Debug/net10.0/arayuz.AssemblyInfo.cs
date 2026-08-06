@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("arayuz")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0f196972cca30d383e470d3876d15b9e7716b5c2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b0919b98399b666878eab38687446a942b3b0be7")]
 [assembly: System.Reflection.AssemblyProductAttribute("arayuz")]
 [assembly: System.Reflection.AssemblyTitleAttribute("arayuz")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
