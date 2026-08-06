@@ -4,17 +4,121 @@
     ViewData["Title"] = "Belge Yükle";
 }
 
+<style>
+    #birakma-alani {
+        height: 200px;
+        border: 2px dashed var(--bs-border-color);
+        border-radius: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: var(--bs-secondary-color);
+        transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    #birakma-alani.surukleniyor {
+        border-color: var(--bs-primary);
+        background-color: var(--bs-tertiary-bg);
+    }
+
+    #birakma-alani i {
+        font-size: 3rem;
+    }
+</style>
+
 <h3>Belge Yükle</h3>
 
-<form method="post" enctype="multipart/form-data">
+<form method="post" enctype="multipart/form-data" id="yukle-formu">
     <div class="mb-3">
         <label class="form-label">Dosya</label>
-        <input type="file" asp-for="Dosya" class="form-control" />
+        <input type="file" asp-for="Dosya" class="form-control" id="dosya-girisi" />
     </div>
-    <button type="submit" class="btn btn-primary">Yükle</button>
+
+    <div id="birakma-alani" class="mb-3">
+        <i class="bi bi-cloud-arrow-up"></i>
+        <div class="mt-2" id="birakma-metni">PDF dosyasını buraya sürükleyin</div>
+    </div>
+
+    <button type="submit" class="btn btn-primary" id="yukle-dugmesi">Yükle</button>
 </form>
 
 @if (Model.Mesaj != null)
 {
     <div class="alert alert-info mt-3">@Model.Mesaj</div>
 }
+
+<script>
+    (function () {
+        var girisAlani = document.getElementById("dosya-girisi");
+        var birakmaAlani = document.getElementById("birakma-alani");
+        var birakmaMetni = document.getElementById("birakma-metni");
+        var form = document.getElementById("yukle-formu");
+        var dugme = document.getElementById("yukle-dugmesi");
+        var gonderildi = false;
+
+        function dosyaAdiniGoster() {
+            if (girisAlani.files.length > 0) {
+                birakmaMetni.textContent = girisAlani.files[0].name;
+            } else {
+                birakmaMetni.textContent = "PDF dosyasını buraya sürükleyin";
+            }
+        }
+
+        girisAlani.addEventListener("change", dosyaAdiniGoster);
+
+        ["dragover", "dragenter"].forEach(function (olay) {
+            birakmaAlani.addEventListener(olay, function (e) {
+                e.preventDefault();
+                birakmaAlani.classList.add("surukleniyor");
+            });
+        });
+
+        ["dragleave", "dragend"].forEach(function (olay) {
+            birakmaAlani.addEventListener(olay, function (e) {
+                e.preventDefault();
+                birakmaAlani.classList.remove("surukleniyor");
+            });
+        });
+
+        birakmaAlani.addEventListener("drop", function (e) {
+            e.preventDefault();
+            birakmaAlani.classList.remove("surukleniyor");
+
+            var dosyalar = e.dataTransfer.files;
+            if (dosyalar.length === 0) {
+                return;
+            }
+
+            var dosya = dosyalar[0];
+            if (!dosya.name.toLowerCase().endsWith(".pdf")) {
+                alert("Sadece PDF dosyası bırakabilirsiniz.");
+                return;
+            }
+
+            var aktarici = new DataTransfer();
+            aktarici.items.add(dosya);
+            girisAlani.files = aktarici.files;
+
+            dosyaAdiniGoster();
+        });
+
+        form.addEventListener("submit", function (e) {
+            if (gonderildi) {
+                e.preventDefault();
+                return;
+            }
+
+            if (girisAlani.files.length === 0) {
+                e.preventDefault();
+                alert("Lütfen bir dosya seçin.");
+                return;
+            }
+
+            gonderildi = true;
+            dugme.disabled = true;
+            dugme.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Yükleniyor...';
+        });
+    })();
+</script>
