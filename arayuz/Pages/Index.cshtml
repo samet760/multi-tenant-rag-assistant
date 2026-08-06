@@ -84,10 +84,32 @@
         border: 1px solid var(--bs-border-color);
     }
 
+    #selamlama {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1;
+        text-align: center;
+        width: max-content;
+        max-width: 90%;
+    }
+
+    #selamlama-baslik {
+        font-size: 1.6rem;
+        color: var(--bs-body-color);
+    }
+
+    #selamlama-alt {
+        font-size: 0.95rem;
+        color: var(--bs-secondary-color);
+        margin-top: 0.25rem;
+    }
+
     #parlama {
-        --parlama-1: #93c5fd;
-        --parlama-2: #c4b5fd;
-        --parlama-3: #bfdbfe;
+        --parlama-1: #60a5fa;
+        --parlama-2: #a78bfa;
+        --parlama-3: #38bdf8;
         position: absolute;
         top: 50%;
         left: 50%;
@@ -95,18 +117,22 @@
         height: 240px;
         pointer-events: none;
         z-index: -1;
-        filter: blur(30px);
-        opacity: 0.75;
+        filter: blur(20px);
+        opacity: 0.95;
         transform: translate(-50%, -50%);
-        animation: parlamaSalinim 19s ease-in-out infinite;
+        animation: parlamaSalinim 11s ease-in-out infinite;
         transition: top 1s ease, left 1s ease, right 1s ease, bottom 1s ease,
-                    width 1s ease, height 1s ease, filter 1s ease, opacity 1s ease;
+                    width 1s ease, height 1s ease, filter 1s ease, opacity 0.8s ease;
     }
 
     [data-bs-theme="dark"] #parlama {
-        --parlama-1: #1e3a8a;
-        --parlama-2: #4c1d95;
-        --parlama-3: #6d28d9;
+        --parlama-1: #4f46e5;
+        --parlama-2: #9333ea;
+        --parlama-3: #7c3aed;
+    }
+
+    #parlama.parlama-gizli {
+        opacity: 0;
     }
 
     .parlama-katman {
@@ -118,7 +144,7 @@
         background: var(--parlama-1);
         border-radius: 58% 42% 65% 35% / 45% 55% 40% 60%;
         transform: translate(-10%, -6%) scale(1);
-        animation: parlamaKatman1 7s ease-in-out infinite;
+        animation: parlamaKatman1 3s ease-in-out infinite;
     }
 
     .parlama-katman-2 {
@@ -126,7 +152,7 @@
         background: var(--parlama-2);
         border-radius: 42% 58% 40% 60% / 55% 45% 60% 40%;
         transform: translate(10%, 6%) rotate(0deg);
-        animation: parlamaKatman2 11s ease-in-out infinite;
+        animation: parlamaKatman2 5s ease-out infinite;
     }
 
     .parlama-katman-3 {
@@ -134,7 +160,7 @@
         background: var(--parlama-3);
         border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
         transform: translate(-4%, 8%) scale(0.9);
-        animation: parlamaKatman3 13s ease-in-out infinite;
+        animation: parlamaKatman3 7s cubic-bezier(0.65, 0, 0.35, 1) infinite;
     }
 
     #parlama.parlama-balonda {
@@ -143,52 +169,116 @@
         left: auto;
         width: auto;
         height: auto;
-        filter: blur(12px);
-        opacity: 0.85;
-        animation: parlamaSalinimKucuk 8s ease-in-out infinite;
+        filter: blur(10px);
+        opacity: 0.95;
+        animation: parlamaSalinimKucuk 4s ease-in-out infinite;
     }
 
     .parlama-balonda .parlama-katman-1 {
-        animation-duration: 3s;
+        animation-duration: 1.2s;
     }
 
     .parlama-balonda .parlama-katman-2 {
-        animation-duration: 4s;
+        animation-duration: 2s;
     }
 
     .parlama-balonda .parlama-katman-3 {
-        animation-duration: 5s;
+        animation-duration: 2.8s;
     }
 
     @@keyframes parlamaKatman1 {
-        0%, 100% {
-            transform: translate(-10%, -6%) scale(1);
+        0% {
+            transform: translate(-10%, -6%) scale(1) rotate(0deg);
+            border-radius: 58% 42% 65% 35% / 45% 55% 40% 60%;
         }
 
-        50% {
-            transform: translate(12%, 10%) scale(1.25);
+        17% {
+            transform: translate(6%, 8%) scale(1.15) rotate(-12deg);
+            border-radius: 40% 60% 45% 55% / 60% 35% 65% 40%;
+        }
+
+        38% {
+            transform: translate(-14%, 4%) scale(0.88) rotate(10deg);
+            border-radius: 65% 35% 55% 45% / 40% 60% 35% 65%;
+        }
+
+        61% {
+            transform: translate(8%, -12%) scale(1.2) rotate(-6deg);
+            border-radius: 45% 55% 35% 65% / 55% 45% 60% 40%;
+        }
+
+        83% {
+            transform: translate(-4%, 10%) scale(0.95) rotate(14deg);
+            border-radius: 55% 45% 60% 40% / 35% 65% 45% 55%;
+        }
+
+        100% {
+            transform: translate(-10%, -6%) scale(1) rotate(0deg);
+            border-radius: 58% 42% 65% 35% / 45% 55% 40% 60%;
         }
     }
 
     @@keyframes parlamaKatman2 {
-        0%, 100% {
-            transform: translate(10%, 6%) rotate(0deg);
+        0% {
+            transform: translate(10%, 6%) scale(0.95) rotate(0deg);
+            border-radius: 42% 58% 40% 60% / 55% 45% 60% 40%;
         }
 
-        50% {
-            transform: translate(-14%, -10%) rotate(150deg);
+        17% {
+            transform: translate(-8%, -10%) scale(1.1) rotate(40deg);
+            border-radius: 60% 40% 55% 45% / 40% 60% 35% 65%;
+        }
+
+        38% {
+            transform: translate(12%, 4%) scale(0.85) rotate(-30deg);
+            border-radius: 35% 65% 60% 40% / 65% 35% 55% 45%;
+        }
+
+        61% {
+            transform: translate(-6%, 12%) scale(1.18) rotate(60deg);
+            border-radius: 55% 45% 35% 65% / 45% 55% 40% 60%;
+        }
+
+        83% {
+            transform: translate(9%, -6%) scale(0.92) rotate(-15deg);
+            border-radius: 48% 52% 58% 42% / 52% 48% 62% 38%;
+        }
+
+        100% {
+            transform: translate(10%, 6%) scale(0.95) rotate(0deg);
+            border-radius: 42% 58% 40% 60% / 55% 45% 60% 40%;
         }
     }
 
     @@keyframes parlamaKatman3 {
-        0%, 100% {
-            transform: translate(-4%, 8%) scale(0.9);
+        0% {
+            transform: translate(-4%, 8%) scale(0.9) rotate(0deg);
             border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
         }
 
-        50% {
-            transform: translate(-4%, 8%) scale(1.2);
+        17% {
+            transform: translate(10%, -8%) scale(1.22) rotate(-20deg);
             border-radius: 35% 65% 65% 35% / 40% 40% 60% 60%;
+        }
+
+        38% {
+            transform: translate(-12%, -4%) scale(0.82) rotate(18deg);
+            border-radius: 55% 45% 40% 60% / 65% 35% 45% 55%;
+        }
+
+        61% {
+            transform: translate(6%, 12%) scale(1.1) rotate(-8deg);
+            border-radius: 40% 60% 55% 45% / 35% 65% 50% 50%;
+        }
+
+        83% {
+            transform: translate(-8%, -10%) scale(0.95) rotate(25deg);
+            border-radius: 65% 35% 45% 55% / 55% 45% 35% 65%;
+        }
+
+        100% {
+            transform: translate(-4%, 8%) scale(0.9) rotate(0deg);
+            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
         }
     }
 
@@ -236,12 +326,16 @@
         <div id="mesajKutusu" class="mb-4">
             @if (Model.Mesajlar.Count == 0)
             {
-                <div id="parlama">
-                    <div class="parlama-katman parlama-katman-1"></div>
-                    <div class="parlama-katman parlama-katman-2"></div>
-                    <div class="parlama-katman parlama-katman-3"></div>
+                <div id="selamlama">
+                    <div id="selamlama-baslik"></div>
+                    <div id="selamlama-alt">Nasıl yardımcı olabilirim?</div>
                 </div>
             }
+            <div id="parlama" class="@(Model.Mesajlar.Count > 0 ? "parlama-gizli" : "")">
+                <div class="parlama-katman parlama-katman-1"></div>
+                <div class="parlama-katman parlama-katman-2"></div>
+                <div class="parlama-katman parlama-katman-3"></div>
+            </div>
             @foreach (var m in Model.Mesajlar)
             {
                 if (m.Rol == "soru")
@@ -275,6 +369,30 @@
 </script>
 
 <script>
+    (function () {
+        var baslik = document.getElementById("selamlama-baslik");
+        if (!baslik) {
+            return;
+        }
+
+        var saat = new Date().getHours();
+        var metin;
+
+        if (saat >= 5 && saat < 12) {
+            metin = "Günaydın";
+        } else if (saat >= 12 && saat < 18) {
+            metin = "İyi günler";
+        } else if (saat >= 18 && saat < 22) {
+            metin = "İyi akşamlar";
+        } else {
+            metin = "İyi geceler";
+        }
+
+        baslik.textContent = metin;
+    })();
+</script>
+
+<script>
     document.getElementById("soru-formu").addEventListener("submit", function () {
         var dugme = document.getElementById("sor-dugmesi");
         dugme.disabled = true;
@@ -302,10 +420,16 @@
         kutu.appendChild(yaziyorSatiri);
 
         var parlama = document.getElementById("parlama");
+        console.log("[parlama] eleman bulundu mu:", !!parlama);
         if (parlama) {
             var yaziyorBalonu = yaziyorSatiri.querySelector(".chat-balon");
-            yaziyorBalonu.appendChild(parlama);
-            parlama.classList.add("parlama-balonda");
+            console.log("[parlama] hedef balon bulundu mu:", !!yaziyorBalonu);
+            if (yaziyorBalonu) {
+                yaziyorBalonu.appendChild(parlama);
+                parlama.classList.remove("parlama-gizli");
+                parlama.classList.add("parlama-balonda");
+                console.log("[parlama] tasindi, yeni ebeveyn balon mu:", parlama.parentElement === yaziyorBalonu);
+            }
         }
 
         kutu.scrollTop = kutu.scrollHeight;
