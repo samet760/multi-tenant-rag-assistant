@@ -4,21 +4,27 @@
     ViewData["Title"] = "Giriş";
 }
 
-<h3>Giriş</h3>
+<div class="d-flex justify-content-center mt-5">
+    <div class="card" style="max-width:400px; width:100%;">
+        <div class="card-body p-4">
+            <h3 class="text-center mb-4">Giriş</h3>
 
-<form method="post">
-    <div class="mb-3">
-        <label class="form-label">E-posta</label>
-        <input asp-for="Eposta" class="form-control" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Şifre</label>
-        <input asp-for="SifreMetni" type="password" class="form-control" />
-    </div>
-    <button type="submit" class="btn btn-primary">Giriş yap</button>
-</form>
+            <form method="post">
+                <div class="mb-3">
+                    <label class="form-label">E-posta</label>
+                    <input asp-for="Eposta" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Şifre</label>
+                    <input asp-for="SifreMetni" type="password" class="form-control" />
+                </div>
+                <button type="submit" class="btn btn-primary">Giriş yap</button>
+            </form>
 
-@if (!string.IsNullOrEmpty(Model.Mesaj))
-{
-    <div class="alert alert-danger mt-3">@Model.Mesaj</div>
-}
+            @if (!string.IsNullOrEmpty(Model.Mesaj))
+            {
+                <div class="alert alert-danger mt-3">@Model.Mesaj</div>
+            }
+        </div>
+    </div>
+</div>

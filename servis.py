@@ -26,8 +26,8 @@ def indeksle_endpoint(
         yol = gecici.name
 
     try:
-        indeksle(tenant_id, yol, dosya_adi)
+        belge_id = indeksle(tenant_id, yol, dosya_adi)
     finally:
         os.remove(yol)
 
-    return {"durum": "tamam"}
+    return {"durum": "tamam", "belge_id": belge_id}

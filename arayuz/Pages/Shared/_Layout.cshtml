@@ -1,75 +1,107 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="utf-8" />
+    <script>
+        (function () {
+            var tema = localStorage.getItem("tema") || "light";
+            document.documentElement.setAttribute("data-bs-theme", tema);
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Doküman Asistanı</title>
     <script type="importmap"></script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/arayuz.styles.css" asp-append-version="true" />
+    <style>
+        .disli-dugmesi .bi-gear-fill {
+            display: inline-block;
+            transition: transform 0.2s ease;
+        }
+
+        .disli-dugmesi:hover .bi-gear-fill {
+            transform: rotate(90deg);
+        }
+    </style>
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm border-bottom box-shadow mb-3">
             <div class="container">
                 @{
                     var logoUrl = User.FindFirst("logo_url")?.Value;
                     var firmaAdi = User.FindFirst("firma_adi")?.Value;
                 }
-                <a class="navbar-brand" asp-area="" asp-page="/Index">
-                    @if (User.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(logoUrl))
+                <div class="d-flex align-items-center gap-2">
+                    <a class="navbar-brand d-flex align-items-center gap-2 mb-0" asp-area="" asp-page="/Index">
+                        @if (User.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(logoUrl))
+                        {
+                            <img src="@logoUrl" style="width:48px;height:48px;border-radius:50%;object-fit:cover" alt="" />
+                        }
+                        else
+                        {
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="48" height="48" style="border-radius:50%;object-fit:cover" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" />
+                                <path d="M15 2v5h5" />
+                                <path d="M8 9h3" />
+                                <path d="M8 13h8" />
+                                <path d="M8 17h8" />
+                            </svg>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(firmaAdi))
+                        {
+                            <span>@firmaAdi</span>
+                        }
+                        else if (User.Identity?.IsAuthenticated != true)
+                        {
+                            <span>Doküman Asistanı</span>
+                        }
+                    </a>
+                    @if (User.Identity?.IsAuthenticated == true)
                     {
-                        <img src="@logoUrl" style="max-height:32px" />
+                        <span class="text-body-secondary">@User.Identity.Name</span>
                     }
-                    else if (User.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(firmaAdi))
-                    {
-                        @firmaAdi
-                    }
-                    else
-                    {
-                        @:Doküman Asistanı
-                    }
-                </a>
+                </div>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                         @if (User.Identity?.IsAuthenticated == true)
-    {
-        <li class="nav-item">
-            <span class="nav-link text-dark">@User.Identity.Name</span>
-        </li>
-        @if (User.IsInRole("yonetici"))
-        {
-            <li class="nav-item">
-                <a class="nav-link text-dark" asp-page="/Yukle">Belge Yükle</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-dark" asp-page="/Kullanicilar">Kullanıcılar</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-dark" asp-page="/Logo">Logo</a>
-            </li>
-        }
-        <li class="nav-item">
-            <a class="nav-link text-dark" asp-page="/Belgeler">Belgelerim</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link text-dark" asp-page="/Cikis">Çıkış</a>
-        </li>
-    }
-    else
-    {
-        <li class="nav-item">
-            <a class="nav-link text-dark" asp-page="/Giris">Giriş</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link text-dark" asp-page="/Kayit">Kayıt</a>
-        </li>
-    }
+                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-end">
+                    <ul class="navbar-nav align-items-sm-center gap-2">
+                        <li class="nav-item">
+                            <button type="button" id="tema-dugmesi" class="btn btn-outline-secondary btn-sm" aria-label="Temayı değiştir">
+                                <i class="bi" id="tema-simgesi"></i>
+                            </button>
+                        </li>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle disli-dugmesi" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-gear-fill"></i>
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    @if (User.IsInRole("yonetici"))
+                                    {
+                                        <li><a class="dropdown-item" asp-page="/Yukle">Belge Yükle</a></li>
+                                        <li><a class="dropdown-item" asp-page="/Kullanicilar">Kullanıcılar</a></li>
+                                        <li><a class="dropdown-item" asp-page="/Logo">Logo</a></li>
+                                    }
+                                    <li><a class="dropdown-item" asp-page="/Belgeler">Belgelerim</a></li>
+                                    <li><a class="dropdown-item" asp-page="/Cikis">Çıkış</a></li>
+                                </ul>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-page="/Giris">Giriş</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-page="/Kayit">Kayıt</a>
+                            </li>
+                        }
                     </ul>
                 </div>
             </div>
@@ -90,6 +122,23 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            function simgeyiGuncelle() {
+                var tema = document.documentElement.getAttribute("data-bs-theme");
+                document.getElementById("tema-simgesi").className = tema === "dark" ? "bi bi-sun-fill" : "bi bi-moon-stars-fill";
+            }
+
+            document.getElementById("tema-dugmesi").addEventListener("click", function () {
+                var yeni = document.documentElement.getAttribute("data-bs-theme") === "dark" ? "light" : "dark";
+                document.documentElement.setAttribute("data-bs-theme", yeni);
+                localStorage.setItem("tema", yeni);
+                simgeyiGuncelle();
+            });
+
+            simgeyiGuncelle();
+        })();
+    </script>
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>

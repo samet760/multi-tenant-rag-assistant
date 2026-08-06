@@ -1,3 +1,5 @@
+using Microsoft.Extensions.FileProviders;
+
 DotNetEnv.Env.Load("../.env");
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,6 +26,14 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseRouting();
+
+var logolarYolu = Path.Combine(app.Environment.WebRootPath, "logolar");
+Directory.CreateDirectory(logolarYolu);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(logolarYolu),
+    RequestPath = "/logolar"
+});
 
 app.UseAuthentication();
 app.UseAuthorization();

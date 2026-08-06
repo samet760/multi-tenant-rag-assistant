@@ -31,6 +31,7 @@ def indeksle(tenant, pdf_yolu, dosya_adi):
             baglanti.commit()
 
     print(f"yazildi: {len(parcalar)} (tenant={tenant}, belge_id={belge_id}, dosya={dosya_adi})")
+    return belge_id
 
 
 if __name__ == "__main__":

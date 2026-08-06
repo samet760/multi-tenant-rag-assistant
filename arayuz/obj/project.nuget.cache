@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "XEnrMAajOJg=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\samed\\english-home-bot\\arayuz\\arayuz.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\samed\\.nuget\\packages\\dotnetenv\\3.2.0\\dotnetenv.3.2.0.nupkg.sha512",
+    "C:\\Users\\samed\\.nuget\\packages\\npgsql\\10.0.3\\npgsql.10.0.3.nupkg.sha512",
+    "C:\\Users\\samed\\.nuget\\packages\\superpower\\3.0.0\\superpower.3.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

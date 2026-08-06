@@ -6,9 +6,26 @@
 
 <h2>Belgelerim</h2>
 
+<form method="get" class="input-group mb-3" style="max-width:400px">
+    <input asp-for="Ara" class="form-control" placeholder="Dosya adına göre ara" />
+    <button type="submit" class="btn btn-outline-primary">Ara</button>
+</form>
+
+@if (!string.IsNullOrEmpty(Model.Ara))
+{
+    <p><a href="/Belgeler">Temizle</a></p>
+}
+
 @if (Model.Liste.Count == 0)
 {
-    <p>Henüz belge yüklenmemiş. <a href="/Yukle">Belge yükle</a></p>
+    if (string.IsNullOrEmpty(Model.Ara))
+    {
+        <p>Henüz belge yüklenmemiş. <a href="/Yukle">Belge yükle</a></p>
+    }
+    else
+    {
+        <p>Eşleşen belge bulunamadı.</p>
+    }
 }
 else
 {
@@ -28,7 +45,16 @@ else
             @foreach (var belge in Model.Liste)
             {
                 <tr>
-                    <td>@belge.DosyaAdi</td>
+                    <td>
+                        @if (!string.IsNullOrEmpty(belge.DosyaYolu))
+                        {
+                            <a href="/BelgeIndir?id=@belge.Id" target="_blank">@belge.DosyaAdi</a>
+                        }
+                        else
+                        {
+                            @belge.DosyaAdi
+                        }
+                    </td>
                     <td>@belge.Tarih.ToString("dd.MM.yyyy HH:mm")</td>
                     <td>@belge.ParcaSayisi</td>
                     @if (User.IsInRole("yonetici"))
