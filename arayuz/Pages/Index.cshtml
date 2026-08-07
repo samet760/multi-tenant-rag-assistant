@@ -301,11 +301,19 @@
             window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
         // Dusuk cozunurluklu skaler alan icin kucuk, ayri bir tuval (bkz. alanDegerlendir/boyutlandir).
-        var GRID_W = 72;
-        var GRID_H = 72;
+        // 72 gorunur pixelasyona yol aciyordu; 144 hala ucuz ama belirgin sekilde daha pürüzsüz.
+        var GRID_W = 144;
+        var GRID_H = 144;
         var ESIK = 1;
         var ESIK_YUMUSAKLIGI = 0.35;
         var ALAN_HEDEF_ARALIGI = 1000 / 30; // pahali alan hesaplamasi icin ~30fps hedefi
+
+        // Govde/parlama/kontur yankilari eski kare sinirinda kirpiliyordu. Fizik/parcacik
+        // uzayi HER ZAMAN mantiksal alanW/alanH icinde kalir (motion/size DEGISMEZ) - sadece
+        // render asamasinda bu oran kadar seffaf, tasan bir dolgu payi eklenir (bkz.
+        // boyutlandir, pasoCiz, yankilariCiz, gradyanOlustur).
+        var DOLGU_ORANI = 0.35;
+        var alanW = 0, alanH = 0, dolguX = 0, dolguY = 0;
 
         var kucukTuval = document.createElement("canvas");
         kucukTuval.width = GRID_W;
@@ -343,15 +351,36 @@
         var YANKI_SOGUMA_MS = 550; // enerjik olmayan normal hareket surekli yanki tetiklemesin
 
         // 1) Kurulum: tuval boyutunu #parlama'nin gercek gorunen kutusundan al.
-        // devicePixelRatio kasitli olarak sinirlanir - bu kucuk, susleyici bir gorsel,
-        // tam retina cozunurlugu gereksiz maliyet demektir.
+        // devicePixelRatio kasitli olarak sinirlanir (netlik icin makul bir tavanla) - bu
+        // kucuk, susleyici bir gorsel, tam retina cozunurlugu gereksiz maliyet demektir.
+        //
+        // Canvas'in kendisi #parlama'dan DOLGU_ORANI kadar daha buyuk cizilir ve negatif
+        // left/top ile disariya tasirilir, boylece #parlama'nin kendi layout kutusu
+        // (clientWidth/clientHeight, getBoundingClientRect - reparenting/loading kodunun
+        // guvendigi seyler) hicbir sekilde degismez; sadece render icin fazladan seffaf
+        // alan acilir. Fizik hala mantiksal alanW/alanH uzerinde calisir, bu yuzden gorunen
+        // boyut/hareket AYNI kalir - degisen sadece tasmaya izin verilen kirpma sinirlaridir.
         function boyutlandir() {
-            var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+            var dpr = Math.min(window.devicePixelRatio || 1, 2);
             var genislikCss = parlama.clientWidth || 300;
             var yukseklikCss = parlama.clientHeight || 300;
+            var dolguXCss = genislikCss * DOLGU_ORANI / 2;
+            var dolguYCss = yukseklikCss * DOLGU_ORANI / 2;
 
-            canvas.width = Math.round(genislikCss * dpr);
-            canvas.height = Math.round(yukseklikCss * dpr);
+            canvas.style.left = (-dolguXCss) + "px";
+            canvas.style.top = (-dolguYCss) + "px";
+            canvas.style.right = "auto";
+            canvas.style.bottom = "auto";
+            canvas.style.width = (genislikCss + dolguXCss * 2) + "px";
+            canvas.style.height = (yukseklikCss + dolguYCss * 2) + "px";
+
+            alanW = Math.round(genislikCss * dpr);
+            alanH = Math.round(yukseklikCss * dpr);
+            dolguX = Math.round(dolguXCss * dpr);
+            dolguY = Math.round(dolguYCss * dpr);
+
+            canvas.width = alanW + dolguX * 2;
+            canvas.height = alanH + dolguY * 2;
             geciciTuval.width = canvas.width;
             geciciTuval.height = canvas.height;
 
@@ -390,8 +419,8 @@
         // 2) Baslangic durumu: 1 cekirdek + 4 tandril (her biri cekirdek -- p1 -- p2 -- p3 -- uc
         // seklinde 4 halkalik bir zincir). Halkalar birbirini gorunmez yay baglantilariyla takip eder.
         function parcaciklariBaslat() {
-            var w = canvas.width;
-            var merkezX = canvas.width / 2, merkezY = canvas.height / 2;
+            var w = alanW;
+            var merkezX = alanW / 2, merkezY = alanH / 2;
             var simdi = performance.now();
             var dogalMesafe = w * 0.075;
 
@@ -448,8 +477,8 @@
         // bu, cekirdegin sabit kalmasini saglayan asil mekanizmadir) ve sinirin otesinde
         // giderek guclenen, sert olmayan bir geri cagirma (duvar sekmesi degil).
         function merkezVeSinirKuvvetiUygula() {
-            var merkezX = canvas.width / 2, merkezY = canvas.height / 2;
-            var sinirYaricap = canvas.width * 0.48;
+            var merkezX = alanW / 2, merkezY = alanH / 2;
+            var sinirYaricap = alanW * 0.48;
 
             for (var i = 0; i < tumParcaciklar.length; i++) {
                 var p = tumParcaciklar[i];
@@ -477,7 +506,7 @@
                     continue;
                 }
                 var aci = Math.random() * Math.PI * 2;
-                var guc = canvas.width * (0.08 + Math.random() * 0.14);
+                var guc = alanW * (0.08 + Math.random() * 0.14);
                 p.vx += Math.cos(aci) * guc;
                 p.vy += Math.sin(aci) * guc;
                 p.sonrakiZayifKuvvet = zamanMs + 400 + Math.random() * 700;
@@ -493,11 +522,11 @@
             }
             var hedef = uclar[Math.floor(Math.random() * uclar.length)];
             var aci = Math.random() * Math.PI * 2;
-            var guc = canvas.width * (0.4 + Math.random() * 1.8);
+            var guc = alanW * (0.4 + Math.random() * 1.8);
 
             // Belirgin sekilde guclu darbelerde, darbenin kendi yonunu ("aci") kontur
             // yankisinin yonlu egilimi olarak kullan - dalganin nereden geldigi belli olsun.
-            var gucOrani = (guc / canvas.width - 0.4) / 1.8;
+            var gucOrani = (guc / alanW - 0.4) / 1.8;
             if (gucOrani > 0.35) {
                 yankiOlustur(zamanMs, Math.cos(aci), Math.sin(aci), gucOrani);
             }
@@ -519,15 +548,15 @@
             if (!aktifVorteks && zamanMs >= sonrakiVorteksKontrolu) {
                 var merkezdeMi = Math.random() < 0.5;
                 var kaynak = merkezdeMi
-                    ? { x: canvas.width / 2, y: canvas.height / 2 }
+                    ? { x: alanW / 2, y: alanH / 2 }
                     : tumParcaciklar[Math.floor(Math.random() * tumParcaciklar.length)];
 
                 aktifVorteks = {
                     x: kaynak.x, y: kaynak.y,
                     bitis: zamanMs + 600 + Math.random() * 1000,
                     yon: Math.random() < 0.5 ? 1 : -1,
-                    guc: canvas.width * (0.5 + Math.random() * 0.8),
-                    yaricap: canvas.width * 0.5
+                    guc: alanW * (0.5 + Math.random() * 0.8),
+                    yaricap: alanW * 0.5
                 };
                 sonrakiVorteksKontrolu = aktifVorteks.bitis + 800 + Math.random() * 1800;
             }
@@ -602,7 +631,7 @@
         // Bu, bir ucun cekirdege, baska bir tandrile ya da bagimsiz bir damlaya "dokunup"
         // yeni bir sivi kopru olusturmasini saglar - kopru hicbir yerde elle cizilmez.
         function yenidenBaglan() {
-            var esikMesafe = canvas.width * 0.075 * 1.25;
+            var esikMesafe = alanW * 0.075 * 1.25;
 
             for (var i = 0; i < tumParcaciklar.length; i++) {
                 var p = tumParcaciklar[i];
@@ -625,7 +654,7 @@
                 }
 
                 if (enYakin && enYakinMesafe < esikMesafe) {
-                    baglar.push(kenarOlustur(enYakin, p, canvas.width * 0.075));
+                    baglar.push(kenarOlustur(enYakin, p, alanW * 0.075));
                 }
             }
         }
@@ -717,9 +746,9 @@
             var idx = 0;
 
             for (var gy = 0; gy < GRID_H; gy++) {
-                var py = (gy + 0.5) / GRID_H * canvas.height;
+                var py = (gy + 0.5) / GRID_H * alanH;
                 for (var gx = 0; gx < GRID_W; gx++) {
-                    var px = (gx + 0.5) / GRID_W * canvas.width;
+                    var px = (gx + 0.5) / GRID_W * alanW;
                     var toplam = 0;
 
                     for (var n = 0; n < tumParcaciklar.length; n++) {
@@ -752,8 +781,8 @@
             var renk3 = stil.getPropertyValue("--parlama-3").trim();
 
             var g = baglam.createLinearGradient(
-                canvas.width * 0.25, canvas.height * 0.25,
-                canvas.width * 0.75, canvas.height * 0.75);
+                dolguX + alanW * 0.25, dolguY + alanH * 0.25,
+                dolguX + alanW * 0.75, dolguY + alanH * 0.75);
             g.addColorStop(0, renk1);
             g.addColorStop(0.55, renk2);
             g.addColorStop(1, renk3);
@@ -770,7 +799,7 @@
                 geciciBaglam.filter = "blur(" + bulanikPx + "px)";
             }
             geciciBaglam.drawImage(kucukTuval, 0, 0, GRID_W, GRID_H,
-                -buyume / 2, -buyume / 2, canvas.width + buyume, canvas.height + buyume);
+                dolguX - buyume / 2, dolguY - buyume / 2, alanW + buyume, alanH + buyume);
             geciciBaglam.filter = "none";
             geciciBaglam.globalCompositeOperation = "source-in";
             geciciBaglam.fillStyle = gradyan;
@@ -815,8 +844,8 @@
                     omur: 420 + k * 110 + Math.random() * 220,
                     yonX: yonX, yonY: yonY,
                     olcekBitis: 1.2 + k * 0.16 + Math.random() * 0.12,
-                    kaymaBitis: canvas.width * (0.05 + k * 0.045),
-                    bulanikBitis: canvas.width * (0.018 + k * 0.014),
+                    kaymaBitis: alanW * (0.05 + k * 0.045),
+                    bulanikBitis: alanW * (0.018 + k * 0.014),
                     alfaBaslangic: (0.24 - k * 0.06) * (0.55 + guc * 0.45)
                 });
             }
@@ -832,7 +861,7 @@
             }
 
             var renk = getComputedStyle(parlama).getPropertyValue("--parlama-2").trim();
-            var merkezX = canvas.width / 2, merkezY = canvas.height / 2;
+            var merkezX = dolguX + alanW / 2, merkezY = dolguY + alanH / 2;
 
             for (var i = yankilar.length - 1; i >= 0; i--) {
                 var y = yankilar[i];
@@ -857,8 +886,8 @@
                     continue;
                 }
 
-                var genislik = canvas.width * olcek;
-                var yukseklik = canvas.height * olcek;
+                var genislik = alanW * olcek;
+                var yukseklik = alanH * olcek;
                 var hedefX = merkezX - genislik / 2 + y.yonX * kayma;
                 var hedefY = merkezY - yukseklik / 2 + y.yonY * kayma;
 
@@ -888,7 +917,7 @@
             var gradyan = gradyanOlustur();
             baglam.clearRect(0, 0, canvas.width, canvas.height);
             yankilariCiz(zamanMs);
-            pasoCiz(canvas.width * 0.08, Math.round(canvas.width * 0.03), 0.3, gradyan);
+            pasoCiz(alanW * 0.08, Math.round(alanW * 0.03), 0.3, gradyan);
             pasoCiz(0, 0, 1, gradyan);
         }
 
