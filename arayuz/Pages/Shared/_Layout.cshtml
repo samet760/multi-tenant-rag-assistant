@@ -45,6 +45,66 @@
         .disli-dugmesi:hover .bi-gear-fill {
             transform: rotate(90deg);
         }
+
+        #disli-dugmesi {
+            color: #b45309;
+        }
+
+        #disli-dugmesi:hover {
+            color: #f59e0b;
+        }
+
+        [data-bs-theme="dark"] #disli-dugmesi {
+            color: #a78bfa;
+        }
+
+        [data-bs-theme="dark"] #disli-dugmesi:hover {
+            color: #c4b5fd;
+        }
+
+        #tema-dugmesi {
+            background-color: transparent;
+            background-image: none;
+            border-color: transparent;
+            box-shadow: none;
+        }
+
+        #tema-dugmesi:hover {
+            background-color: transparent;
+            border-color: transparent;
+            color: var(--bs-btn-color);
+            filter: brightness(1.15);
+        }
+
+        #tema-dugmesi:focus {
+            outline: 0;
+            box-shadow: none;
+            background-color: transparent;
+            border-color: transparent;
+        }
+
+        #tema-dugmesi:focus-visible {
+            outline: 0;
+            border-radius: 50%;
+            box-shadow: 0 0 0 0.15rem rgba(245, 158, 11, 0.4);
+        }
+
+        #tema-dugmesi:active {
+            background-color: transparent;
+            border-color: transparent;
+            color: var(--bs-btn-color);
+            box-shadow: none;
+            filter: brightness(0.9);
+        }
+
+        #tema-dugmesi:active:focus-visible {
+            box-shadow: 0 0 0 0.15rem rgba(245, 158, 11, 0.4);
+        }
+
+        [data-bs-theme="dark"] #tema-dugmesi:focus-visible,
+        [data-bs-theme="dark"] #tema-dugmesi:active:focus-visible {
+            box-shadow: 0 0 0 0.15rem rgba(124, 58, 237, 0.45);
+        }
     </style>
 </head>
 <body>
@@ -95,7 +155,7 @@
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle disli-dugmesi" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <a id="disli-dugmesi" class="nav-link dropdown-toggle disli-dugmesi" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="bi bi-gear-fill"></i>
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end">

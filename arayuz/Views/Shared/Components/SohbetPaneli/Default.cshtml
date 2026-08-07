@@ -15,6 +15,12 @@
 
     .yeni-sohbet-dugmesi {
         border-radius: 999px;
+        color: #b45309;
+        border-color: #f59e0b;
+        background-color: transparent;
+        background-image: none;
+        transition: filter .15s ease-in-out, background-image .15s ease-in-out,
+                    color .15s ease-in-out, box-shadow .15s ease-in-out, border-color .15s ease-in-out;
     }
 
     .yeni-sohbet-dugmesi .yeni-sohbet-metni {
@@ -24,6 +30,54 @@
 
     .yeni-sohbet-dugmesi:hover .yeni-sohbet-metni {
         display: inline;
+    }
+
+    .yeni-sohbet-dugmesi:hover {
+        color: #fff;
+        border-color: transparent;
+        background-image: linear-gradient(135deg, #f59e0b, #f97316);
+    }
+
+    .yeni-sohbet-dugmesi:focus {
+        outline: 0;
+        box-shadow: none;
+    }
+
+    .yeni-sohbet-dugmesi:focus-visible {
+        outline: 0;
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 0.15rem rgba(245, 158, 11, 0.4);
+    }
+
+    #yeni-sohbet-dugmesi:active {
+        color: #fff;
+        border-color: transparent;
+        background-image: linear-gradient(135deg, #ea580c, #f59e0b);
+        filter: brightness(0.95);
+        box-shadow: none;
+    }
+
+    #yeni-sohbet-dugmesi:active:focus-visible {
+        box-shadow: 0 0 0 0.15rem rgba(245, 158, 11, 0.4);
+    }
+
+    [data-bs-theme="dark"] .yeni-sohbet-dugmesi {
+        color: #c4b5fd;
+        border-color: #7c3aed;
+    }
+
+    [data-bs-theme="dark"] .yeni-sohbet-dugmesi:hover {
+        border-color: transparent;
+        background-image: linear-gradient(135deg, #4f46e5, #7c3aed);
+    }
+
+    [data-bs-theme="dark"] .yeni-sohbet-dugmesi:focus-visible {
+        border-color: #7c3aed;
+        box-shadow: 0 0 0 0.15rem rgba(124, 58, 237, 0.45);
+    }
+
+    [data-bs-theme="dark"] #yeni-sohbet-dugmesi:active {
+        background-image: linear-gradient(135deg, #4338ca, #6d28d9);
     }
 
     .sohbet-paneli-baslik {
@@ -80,7 +134,7 @@
 </style>
 
 <div class="sohbet-paneli">
-    <a asp-page="/Index" class="btn btn-sm btn-outline-primary w-100 mb-3 yeni-sohbet-dugmesi">
+    <a asp-page="/Index" id="yeni-sohbet-dugmesi" class="btn btn-sm btn-outline-primary w-100 mb-3 yeni-sohbet-dugmesi">
         <span>+</span>
         <span class="yeni-sohbet-metni">Yeni sohbet</span>
     </a>
