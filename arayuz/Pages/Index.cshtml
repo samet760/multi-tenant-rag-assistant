@@ -86,7 +86,7 @@
 
     #selamlama {
         position: absolute;
-        top: 50%;
+        top: calc(50% - 100px);
         left: 50%;
         transform: translate(-50%, -50%);
         z-index: 1;
@@ -107,22 +107,20 @@
     }
 
     #parlama {
-        --parlama-1: #60a5fa;
-        --parlama-2: #a78bfa;
-        --parlama-3: #38bdf8;
+        --parlama-1: #fbbf24;
+        --parlama-2: #fb923c;
+        --parlama-3: #ef4444;
         position: absolute;
-        top: 50%;
+        top: calc(50% + 80px);
         left: 50%;
-        width: 240px;
-        height: 240px;
+        width: 300px;
+        height: 300px;
         pointer-events: none;
         z-index: -1;
-        filter: blur(20px);
-        opacity: 0.95;
+        opacity: 1;
         transform: translate(-50%, -50%);
-        animation: parlamaSalinim 11s ease-in-out infinite;
         transition: top 1s ease, left 1s ease, right 1s ease, bottom 1s ease,
-                    width 1s ease, height 1s ease, filter 1s ease, opacity 0.8s ease;
+                    width 1s ease, height 1s ease, opacity 0.8s ease;
     }
 
     [data-bs-theme="dark"] #parlama {
@@ -135,32 +133,12 @@
         opacity: 0;
     }
 
-    .parlama-katman {
+    .parlama-canvas {
         position: absolute;
-    }
-
-    .parlama-katman-1 {
-        inset: 8% 38% 32% 6%;
-        background: var(--parlama-1);
-        border-radius: 58% 42% 65% 35% / 45% 55% 40% 60%;
-        transform: translate(-10%, -6%) scale(1);
-        animation: parlamaKatman1 3s ease-in-out infinite;
-    }
-
-    .parlama-katman-2 {
-        inset: 28% 6% 10% 32%;
-        background: var(--parlama-2);
-        border-radius: 42% 58% 40% 60% / 55% 45% 60% 40%;
-        transform: translate(10%, 6%) rotate(0deg);
-        animation: parlamaKatman2 5s ease-out infinite;
-    }
-
-    .parlama-katman-3 {
-        inset: 18% 20% 16% 22%;
-        background: var(--parlama-3);
-        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-        transform: translate(-4%, 8%) scale(0.9);
-        animation: parlamaKatman3 7s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
     }
 
     #parlama.parlama-balonda {
@@ -169,127 +147,12 @@
         left: auto;
         width: auto;
         height: auto;
-        filter: blur(10px);
         opacity: 0.95;
         animation: parlamaSalinimKucuk 4s ease-in-out infinite;
     }
 
-    .parlama-balonda .parlama-katman-1 {
-        animation-duration: 1.2s;
-    }
-
-    .parlama-balonda .parlama-katman-2 {
-        animation-duration: 2s;
-    }
-
-    .parlama-balonda .parlama-katman-3 {
-        animation-duration: 2.8s;
-    }
-
-    @@keyframes parlamaKatman1 {
-        0% {
-            transform: translate(-10%, -6%) scale(1) rotate(0deg);
-            border-radius: 58% 42% 65% 35% / 45% 55% 40% 60%;
-        }
-
-        17% {
-            transform: translate(6%, 8%) scale(1.15) rotate(-12deg);
-            border-radius: 40% 60% 45% 55% / 60% 35% 65% 40%;
-        }
-
-        38% {
-            transform: translate(-14%, 4%) scale(0.88) rotate(10deg);
-            border-radius: 65% 35% 55% 45% / 40% 60% 35% 65%;
-        }
-
-        61% {
-            transform: translate(8%, -12%) scale(1.2) rotate(-6deg);
-            border-radius: 45% 55% 35% 65% / 55% 45% 60% 40%;
-        }
-
-        83% {
-            transform: translate(-4%, 10%) scale(0.95) rotate(14deg);
-            border-radius: 55% 45% 60% 40% / 35% 65% 45% 55%;
-        }
-
-        100% {
-            transform: translate(-10%, -6%) scale(1) rotate(0deg);
-            border-radius: 58% 42% 65% 35% / 45% 55% 40% 60%;
-        }
-    }
-
-    @@keyframes parlamaKatman2 {
-        0% {
-            transform: translate(10%, 6%) scale(0.95) rotate(0deg);
-            border-radius: 42% 58% 40% 60% / 55% 45% 60% 40%;
-        }
-
-        17% {
-            transform: translate(-8%, -10%) scale(1.1) rotate(40deg);
-            border-radius: 60% 40% 55% 45% / 40% 60% 35% 65%;
-        }
-
-        38% {
-            transform: translate(12%, 4%) scale(0.85) rotate(-30deg);
-            border-radius: 35% 65% 60% 40% / 65% 35% 55% 45%;
-        }
-
-        61% {
-            transform: translate(-6%, 12%) scale(1.18) rotate(60deg);
-            border-radius: 55% 45% 35% 65% / 45% 55% 40% 60%;
-        }
-
-        83% {
-            transform: translate(9%, -6%) scale(0.92) rotate(-15deg);
-            border-radius: 48% 52% 58% 42% / 52% 48% 62% 38%;
-        }
-
-        100% {
-            transform: translate(10%, 6%) scale(0.95) rotate(0deg);
-            border-radius: 42% 58% 40% 60% / 55% 45% 60% 40%;
-        }
-    }
-
-    @@keyframes parlamaKatman3 {
-        0% {
-            transform: translate(-4%, 8%) scale(0.9) rotate(0deg);
-            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-        }
-
-        17% {
-            transform: translate(10%, -8%) scale(1.22) rotate(-20deg);
-            border-radius: 35% 65% 65% 35% / 40% 40% 60% 60%;
-        }
-
-        38% {
-            transform: translate(-12%, -4%) scale(0.82) rotate(18deg);
-            border-radius: 55% 45% 40% 60% / 65% 35% 45% 55%;
-        }
-
-        61% {
-            transform: translate(6%, 12%) scale(1.1) rotate(-8deg);
-            border-radius: 40% 60% 55% 45% / 35% 65% 50% 50%;
-        }
-
-        83% {
-            transform: translate(-8%, -10%) scale(0.95) rotate(25deg);
-            border-radius: 65% 35% 45% 55% / 55% 45% 35% 65%;
-        }
-
-        100% {
-            transform: translate(-4%, 8%) scale(0.9) rotate(0deg);
-            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-        }
-    }
-
-    @@keyframes parlamaSalinim {
-        0%, 100% {
-            transform: translate(-50%, -50%) rotate(-4deg);
-        }
-
-        50% {
-            transform: translate(-50%, -50%) rotate(4deg);
-        }
+    .parlama-balonda .parlama-canvas {
+        filter: blur(1px);
     }
 
     @@keyframes parlamaSalinimKucuk {
@@ -303,14 +166,7 @@
     }
 
     @@media (prefers-reduced-motion: reduce) {
-        #parlama,
-        #parlama.parlama-balonda,
-        .parlama-katman-1,
-        .parlama-katman-2,
-        .parlama-katman-3,
-        .parlama-balonda .parlama-katman-1,
-        .parlama-balonda .parlama-katman-2,
-        .parlama-balonda .parlama-katman-3 {
+        #parlama.parlama-balonda {
             animation: none;
         }
     }
@@ -332,9 +188,7 @@
                 </div>
             }
             <div id="parlama" class="@(Model.Mesajlar.Count > 0 ? "parlama-gizli" : "")">
-                <div class="parlama-katman parlama-katman-1"></div>
-                <div class="parlama-katman parlama-katman-2"></div>
-                <div class="parlama-katman parlama-katman-3"></div>
+                <canvas class="parlama-canvas" aria-hidden="true"></canvas>
             </div>
             @foreach (var m in Model.Mesajlar)
             {
@@ -393,7 +247,601 @@
 </script>
 
 <script>
+    (function () {
+        var parlama = document.getElementById("parlama");
+        var canvas = parlama && parlama.querySelector(".parlama-canvas");
+        if (!parlama || !canvas) {
+            return;
+        }
+        var baglam = canvas.getContext("2d");
+
+        var azaltilmisHareket = window.matchMedia &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        // Dusuk cozunurluklu skaler alan icin kucuk, ayri bir tuval (bkz. alanDegerlendir/boyutlandir).
+        var GRID_W = 72;
+        var GRID_H = 72;
+        var ESIK = 1;
+        var ESIK_YUMUSAKLIGI = 0.35;
+        var ALAN_HEDEF_ARALIGI = 1000 / 30; // pahali alan hesaplamasi icin ~30fps hedefi
+
+        var kucukTuval = document.createElement("canvas");
+        kucukTuval.width = GRID_W;
+        kucukTuval.height = GRID_H;
+        var kucukBaglam = kucukTuval.getContext("2d");
+        var alanVerisi = kucukBaglam.createImageData(GRID_W, GRID_H);
+
+        var geciciTuval = document.createElement("canvas");
+        var geciciBaglam = geciciTuval.getContext("2d");
+
+        // Cekirdek + tandril zincirleri (bkz. parcaciklariBaslat) - tumu ayni duz listede
+        // tutulur ki alanDegerlendir hicbir degisiklik gerektirmeden onlari okuyabilsin.
+        var tumParcaciklar = [];
+        var baglar = [];   // aktif yay baglantilari: {a, b, dogalMesafe, gerginlikSuresi, kopmaSuresi}
+        var uclar = [];    // her tandrilin sabit "uc" parcacigi - guclu itkilerin hedefi
+        var cekirdek = null;
+
+        var YAY_SERTLIGI = 9;
+        var GERME_ESIGI = 2.4; // dogal mesafenin kac kati asilirsa kopma sayaci islemeye baslar
+
+        var sonrakiUcImpulsu = 0;
+        var aktifVorteks = null;
+        var sonrakiVorteksKontrolu = 0;
+        var esikHedef = 1;
+        var sonrakiEsikKarari = 0;
+
+        var sonKareZamani = 0;
+        var sonAlanZamani = 0;
+
+        // 1) Kurulum: tuval boyutunu #parlama'nin gercek gorunen kutusundan al.
+        // devicePixelRatio kasitli olarak sinirlanir - bu kucuk, susleyici bir gorsel,
+        // tam retina cozunurlugu gereksiz maliyet demektir.
+        function boyutlandir() {
+            var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+            var genislikCss = parlama.clientWidth || 300;
+            var yukseklikCss = parlama.clientHeight || 300;
+
+            canvas.width = Math.round(genislikCss * dpr);
+            canvas.height = Math.round(yukseklikCss * dpr);
+            geciciTuval.width = canvas.width;
+            geciciTuval.height = canvas.height;
+
+            baglam.imageSmoothingEnabled = true;
+            geciciBaglam.imageSmoothingEnabled = true;
+        }
+
+        // Tek bir parcacik: cekirdek ya da bir tandril zincirinin bir halkasi.
+        // "durum" gorsel/davranissal degil, salt fizik amaclidir: hangi kuvvetlerin
+        // uygulanacagini ve yaricabin nasil hedeflenecegini belirler.
+        function parcacikOlustur(x, y, r, tur) {
+            return {
+                tur: tur, // "cekirdek" | "tandril"
+                durum: tur === "cekirdek" ? "cekirdek" : "bagli", // "cekirdek" | "bagli" | "serbest"
+                x: x, y: y, vx: 0, vy: 0, fx: 0, fy: 0,
+                r: r, rTaban: r, rHedef: r, rMin: r * 0.3, rMax: r * 1.35,
+                proksimalKenar: null,
+                sonrakiZayifKuvvet: 0,
+                sonrakiYaricapKarari: 0,
+                serbestKaderi: null // "kaybol" | "geriDon" - kopunca rastgele atanir
+            };
+        }
+
+        // Iki parcacik arasinda yumusak bir yay baglantisi kurar. "b" tarafi "a"ya
+        // (merkeze daha yakin olana) bagli kabul edilir; proksimalKenar bu yuzden b'ye yazilir.
+        function kenarOlustur(a, b, dogalMesafe) {
+            var kenar = {
+                a: a, b: b, dogalMesafe: dogalMesafe,
+                gerginlikSuresi: 0, kopmaSuresi: 0.35 + Math.random() * 0.4
+            };
+            b.proksimalKenar = kenar;
+            b.durum = "bagli";
+            return kenar;
+        }
+
+        // 2) Baslangic durumu: 1 cekirdek + 4 tandril (her biri cekirdek -- p1 -- p2 -- p3 -- uc
+        // seklinde 4 halkalik bir zincir). Halkalar birbirini gorunmez yay baglantilariyla takip eder.
+        function parcaciklariBaslat() {
+            var w = canvas.width;
+            var merkezX = canvas.width / 2, merkezY = canvas.height / 2;
+            var simdi = performance.now();
+            var dogalMesafe = w * 0.075;
+
+            cekirdek = parcacikOlustur(merkezX, merkezY, w * 0.17, "cekirdek");
+            cekirdek.rMin = w * 0.15;
+            cekirdek.rMax = w * 0.19;
+            cekirdek.sonrakiYaricapKarari = simdi + 1800 + Math.random() * 1400;
+
+            tumParcaciklar = [cekirdek];
+            baglar = [];
+            uclar = [];
+
+            var tandrilSayisi = 4;
+            var zincirUzunlugu = 4;
+
+            for (var t = 0; t < tandrilSayisi; t++) {
+                var aci = (Math.PI * 2 * t) / tandrilSayisi + Math.random() * 0.6;
+                var onceki = cekirdek;
+
+                for (var k = 0; k < zincirUzunlugu; k++) {
+                    var mesafe = w * 0.05 + k * 2; // baslangicta cekirdege yakin, ic ice
+                    var p = parcacikOlustur(
+                        merkezX + Math.cos(aci) * mesafe,
+                        merkezY + Math.sin(aci) * mesafe,
+                        w * 0.045, "tandril");
+                    p.sonrakiZayifKuvvet = simdi + 400 + Math.random() * 700;
+
+                    baglar.push(kenarOlustur(onceki, p, dogalMesafe));
+                    tumParcaciklar.push(p);
+                    onceki = p;
+                }
+
+                uclar.push(onceki);
+            }
+        }
+
+        // 3a) Komsu parcaciklar arasindaki yay kuvveti: dogal mesafeden uzaklasmis her
+        // baglanti, iki ucunu da (Newton'un ucuncu yasasi geregi) birbirine dogru ceker/iter.
+        // Sertligi dusuk tutuldugu icin zincir kolayca gerilir ve kavis alabilir - rijit degildir.
+        function yayKuvvetleriUygula() {
+            for (var i = 0; i < baglar.length; i++) {
+                var k = baglar[i];
+                var dx = k.b.x - k.a.x, dy = k.b.y - k.a.y;
+                var mesafe = Math.sqrt(dx * dx + dy * dy) || 0.001;
+                var kuvvet = (mesafe - k.dogalMesafe) * YAY_SERTLIGI;
+                var ux = dx / mesafe, uy = dy / mesafe;
+
+                k.a.fx += ux * kuvvet; k.a.fy += uy * kuvvet;
+                k.b.fx -= ux * kuvvet; k.b.fy -= uy * kuvvet;
+            }
+        }
+
+        // 3b) Her parcacik icin hafif bir merkeze meyil (cekirdek icin cok daha guclu -
+        // bu, cekirdegin sabit kalmasini saglayan asil mekanizmadir) ve sinirin otesinde
+        // giderek guclenen, sert olmayan bir geri cagirma (duvar sekmesi degil).
+        function merkezVeSinirKuvvetiUygula() {
+            var merkezX = canvas.width / 2, merkezY = canvas.height / 2;
+            var sinirYaricap = canvas.width * 0.48;
+
+            for (var i = 0; i < tumParcaciklar.length; i++) {
+                var p = tumParcaciklar[i];
+                var dx = merkezX - p.x, dy = merkezY - p.y;
+                var mesafe = Math.sqrt(dx * dx + dy * dy);
+                var k = p.tur === "cekirdek" ? 34 : 0.9;
+
+                p.fx += dx * k;
+                p.fy += dy * k;
+
+                if (mesafe > sinirYaricap) {
+                    var asiri = mesafe - sinirYaricap;
+                    p.fx += (dx / (mesafe || 1)) * asiri * 35;
+                    p.fy += (dy / (mesafe || 1)) * asiri * 35;
+                }
+            }
+        }
+
+        // 3c) Duzensiz araliklarla, her (cekirdek disi) parcacigin hizina kucuk, rastgele
+        // yonlu bir itki eklenir - konum degil hiz degisir, bu yuzden hareket sarsintili degil akicidir.
+        function zayifKuvvetleriUygula(zamanMs) {
+            for (var i = 0; i < tumParcaciklar.length; i++) {
+                var p = tumParcaciklar[i];
+                if (p.tur === "cekirdek" || zamanMs < p.sonrakiZayifKuvvet) {
+                    continue;
+                }
+                var aci = Math.random() * Math.PI * 2;
+                var guc = canvas.width * (0.08 + Math.random() * 0.14);
+                p.vx += Math.cos(aci) * guc;
+                p.vy += Math.sin(aci) * guc;
+                p.sonrakiZayifKuvvet = zamanMs + 400 + Math.random() * 700;
+            }
+        }
+
+        // 3d) Ongorulemeyen araliklarla, rastgele bir tandril ucuna guclu bir itki uygulanir.
+        // Buyukluk genis bir aralikta rastgeledir - bazen kucuk bir sicrayis, bazen govdeyi
+        // gercekten uzaklara gerecek kadar dramatik. Zincirin geri kalani onu gecikmeli takip eder.
+        function ucImpulsuUygula(zamanMs) {
+            if (zamanMs < sonrakiUcImpulsu) {
+                return;
+            }
+            var hedef = uclar[Math.floor(Math.random() * uclar.length)];
+            var aci = Math.random() * Math.PI * 2;
+            var guc = canvas.width * (0.4 + Math.random() * 1.8);
+            hedef.vx += Math.cos(aci) * guc;
+            hedef.vy += Math.sin(aci) * guc;
+            sonrakiUcImpulsu = zamanMs + 1800 + Math.random() * 2700;
+        }
+
+        // 3e) Ara sira, gecici bir "vorteks" penceresi acilir: merkez veya rastgele bir
+        // parcacigin o anki konumu etrafinda, yakindaki parcaciklara teget (radyal degil)
+        // yonde bir kuvvet uygulanir - bu, kollarin duz degil kavisli/donerek hareket
+        // etmesini saglar. Etkinken bile sadece yakin parcaciklari, mesafeyle azalarak etkiler.
+        function vortexKuvvetiUygula(zamanMs) {
+            if (aktifVorteks && zamanMs > aktifVorteks.bitis) {
+                aktifVorteks = null;
+            }
+
+            if (!aktifVorteks && zamanMs >= sonrakiVorteksKontrolu) {
+                var merkezdeMi = Math.random() < 0.5;
+                var kaynak = merkezdeMi
+                    ? { x: canvas.width / 2, y: canvas.height / 2 }
+                    : tumParcaciklar[Math.floor(Math.random() * tumParcaciklar.length)];
+
+                aktifVorteks = {
+                    x: kaynak.x, y: kaynak.y,
+                    bitis: zamanMs + 600 + Math.random() * 1000,
+                    yon: Math.random() < 0.5 ? 1 : -1,
+                    guc: canvas.width * (0.5 + Math.random() * 0.8),
+                    yaricap: canvas.width * 0.5
+                };
+                sonrakiVorteksKontrolu = aktifVorteks.bitis + 800 + Math.random() * 1800;
+            }
+
+            if (!aktifVorteks) {
+                return;
+            }
+
+            for (var i = 0; i < tumParcaciklar.length; i++) {
+                var p = tumParcaciklar[i];
+                var dx = p.x - aktifVorteks.x, dy = p.y - aktifVorteks.y;
+                var mesafe = Math.sqrt(dx * dx + dy * dy);
+                if (mesafe > aktifVorteks.yaricap || mesafe < 1) {
+                    continue;
+                }
+                var etki = 1 - mesafe / aktifVorteks.yaricap;
+                var tx = -dy / mesafe, ty = dx / mesafe; // yaricap vektorune dik (teget) yon
+                var kuvvet = aktifVorteks.guc * etki * aktifVorteks.yon;
+                p.fx += tx * kuvvet;
+                p.fy += ty * kuvvet;
+            }
+        }
+
+        // 3f) Yirtilma: bir baglantinin uzunlugu, dogal mesafesinin GERME_ESIGI katini
+        // asarsa bir sayac islemeye baslar; bu durum yeterince uzun surerse (kenara ozel,
+        // rastgele belirlenmis bir sure) baglanti TAMAMEN kopar. Bu, gecerli parcacik
+        // geometrisinden doner - hicbir yerde "simdi kop" diye zamanli bir olay yoktur.
+        function baglariKopart(dt) {
+            for (var i = baglar.length - 1; i >= 0; i--) {
+                var k = baglar[i];
+                var dx = k.b.x - k.a.x, dy = k.b.y - k.a.y;
+                var mesafe = Math.sqrt(dx * dx + dy * dy);
+
+                if (mesafe > k.dogalMesafe * GERME_ESIGI) {
+                    k.gerginlikSuresi += dt;
+                } else {
+                    k.gerginlikSuresi = Math.max(0, k.gerginlikSuresi - dt * 2);
+                }
+
+                if (k.gerginlikSuresi >= k.kopmaSuresi) {
+                    baglar.splice(i, 1);
+                    k.b.proksimalKenar = null;
+                    serbestBirakZincirGrubu(k.b);
+                }
+            }
+        }
+
+        // Kopan bir baglantinin distal (uc) tarafindaki tum zinciri "serbest damla grubu"
+        // yapar - aralarindaki kendi baglantilari bozulmaz, sadece cekirdege giden yol kesilir.
+        // Her serbest parcacik, kendine ozgu rastgele bir kaderle (kaybol / geri don) kaybolur
+        // ya da govdeye don meyilli hale gelir - hepsi ayni davranmaz.
+        function serbestBirakZincirGrubu(baslangic) {
+            var kuyruk = [baslangic];
+            while (kuyruk.length) {
+                var p = kuyruk.shift();
+                p.durum = "serbest";
+                p.serbestKaderi = Math.random() < 0.5 ? "kaybol" : "geriDon";
+                for (var i = 0; i < baglar.length; i++) {
+                    if (baglar[i].a === p) {
+                        kuyruk.push(baglar[i].b);
+                    }
+                }
+            }
+        }
+
+        // 3g) Yeniden baglanma: proksimal baglantisi olmayan (cekirdek disi) her parcacik,
+        // en yakin diger parcacigini arar; yeterince yaklasirsa YENI bir yay baglantisi kurulur.
+        // Bu, bir ucun cekirdege, baska bir tandrile ya da bagimsiz bir damlaya "dokunup"
+        // yeni bir sivi kopru olusturmasini saglar - kopru hicbir yerde elle cizilmez.
+        function yenidenBaglan() {
+            var esikMesafe = canvas.width * 0.075 * 1.25;
+
+            for (var i = 0; i < tumParcaciklar.length; i++) {
+                var p = tumParcaciklar[i];
+                if (p.tur === "cekirdek" || p.proksimalKenar) {
+                    continue;
+                }
+
+                var enYakin = null, enYakinMesafe = Infinity;
+                for (var j = 0; j < tumParcaciklar.length; j++) {
+                    var aday = tumParcaciklar[j];
+                    if (aday === p) {
+                        continue;
+                    }
+                    var dx = aday.x - p.x, dy = aday.y - p.y;
+                    var mesafe = Math.sqrt(dx * dx + dy * dy);
+                    if (mesafe < enYakinMesafe) {
+                        enYakinMesafe = mesafe;
+                        enYakin = aday;
+                    }
+                }
+
+                if (enYakin && enYakinMesafe < esikMesafe) {
+                    baglar.push(kenarOlustur(enYakin, p, canvas.width * 0.075));
+                }
+            }
+        }
+
+        // 3h) Yaricap guncellemesi: bagli tandril halkalari, KENDI proksimal baglantilarinin
+        // ne kadar gerildigine gore hedef yaricaplarini surekli/yumusak sekilde kucultur -
+        // bu, kalin daire dizileri yerine ince sivi boyunlar olusmasini saglar. Serbest
+        // damlalar kendi kaderlerine (kaybolma/kurtulma) gore buyur ya da kuculur.
+        function yaricaplariGuncelle(zamanMs, dt) {
+            for (var i = 0; i < tumParcaciklar.length; i++) {
+                var p = tumParcaciklar[i];
+
+                if (p.tur === "tandril" && p.durum === "bagli" && p.proksimalKenar) {
+                    var k = p.proksimalKenar;
+                    var dx = k.b.x - k.a.x, dy = k.b.y - k.a.y;
+                    var mesafe = Math.sqrt(dx * dx + dy * dy);
+                    var gerginlik = mesafe / k.dogalMesafe;
+                    var oran = 1.3 - Math.min(1, Math.max(0, gerginlik - 1)) * 0.85;
+                    p.rHedef = Math.max(p.rMin, Math.min(p.rMax, p.rTaban * oran));
+                } else if (p.durum === "serbest") {
+                    p.rHedef = p.serbestKaderi === "kaybol" ? p.rMin * 0.3 : p.rTaban;
+                } else if (p.tur === "cekirdek" && zamanMs >= p.sonrakiYaricapKarari) {
+                    p.rHedef = p.rMin + Math.random() * (p.rMax - p.rMin);
+                    p.sonrakiYaricapKarari = zamanMs + 1800 + Math.random() * 1400;
+                }
+
+                p.r += (p.rHedef - p.r) * Math.min(1, dt * 2.2);
+            }
+        }
+
+        // 3i) Esik surdirimi: ESIK, kucuk bir bant icinde (yaklasik 0.88-1.16) yavasca ve
+        // duzensiz araliklarla yeni bir hedefe dogru surunur - basit bir sinus dongusu degil.
+        // Dusuk ESIK kopruleri daha uzun tutar (yuzey gerilimi zayifmis gibi); yuksek ESIK
+        // ince koprulerin daha kolay kopmasina yol acar (yuzey gerilimi guclumus gibi).
+        function esigiGuncelle(zamanMs, dt) {
+            if (zamanMs >= sonrakiEsikKarari) {
+                esikHedef = 0.88 + Math.random() * 0.28;
+                sonrakiEsikKarari = zamanMs + 1500 + Math.random() * 2500;
+            }
+            ESIK += (esikHedef - ESIK) * Math.min(1, dt * 0.5);
+        }
+
+        // 3) Fizik dongusu: kuvvetleri biriktir -> hizi entegre et -> konumu entegre et ->
+        // yirtilma/yeniden-baglanma/yaricap/esik guncellemelerini uygula. Hicbir yerde
+        // "kopru/kopma/vb." adinda ozel, zamanli bir davranis kodlanmaz - sadece parcacik
+        // geometrisi ve kuvvetler degisir; gorunen sonuc (uzama, kopru, kopma, birlesme)
+        // tamamen alanDegerlendir'in bu geometriyi her karede yeniden yorumlamasindan dogar.
+        function fizigiGuncelle(zamanMs, dt) {
+            for (var i = 0; i < tumParcaciklar.length; i++) {
+                tumParcaciklar[i].fx = 0;
+                tumParcaciklar[i].fy = 0;
+            }
+
+            yayKuvvetleriUygula();
+            merkezVeSinirKuvvetiUygula();
+            vortexKuvvetiUygula(zamanMs);
+
+            for (var j = 0; j < tumParcaciklar.length; j++) {
+                var p = tumParcaciklar[j];
+                p.vx += p.fx * dt;
+                p.vy += p.fy * dt;
+                var sonum = Math.pow(0.05, dt); // kare hizindan bagimsiz surtunme
+                p.vx *= sonum;
+                p.vy *= sonum;
+            }
+
+            zayifKuvvetleriUygula(zamanMs);
+            ucImpulsuUygula(zamanMs);
+
+            for (var m = 0; m < tumParcaciklar.length; m++) {
+                var pp = tumParcaciklar[m];
+                pp.x += pp.vx * dt;
+                pp.y += pp.vy * dt;
+            }
+
+            baglariKopart(dt);
+            yenidenBaglan();
+            yaricaplariGuncelle(zamanMs, dt);
+            esigiGuncelle(zamanMs, dt);
+        }
+
+        // 4) Alan: dusuk cozunurluklu izgeranin her hucresi icin tum parcaciklarin
+        // toplam metaball katkisini hesaplar (r^2/mesafe^2), (yavasca surunen) esik
+        // etrafinda yumusatilmis bir alfaya cevirir ve kucuk tuvale yazar. Bu fonksiyon
+        // parcaciklarin nereden geldigini (cekirdek/tandril/serbest) bilmez - sadece
+        // duz bir x/y/r listesi okur, bu yuzden yeni hareket modeliyle degismeden calisir.
+        function alanDegerlendir() {
+            var veri = alanVerisi.data;
+            var idx = 0;
+
+            for (var gy = 0; gy < GRID_H; gy++) {
+                var py = (gy + 0.5) / GRID_H * canvas.height;
+                for (var gx = 0; gx < GRID_W; gx++) {
+                    var px = (gx + 0.5) / GRID_W * canvas.width;
+                    var toplam = 0;
+
+                    for (var n = 0; n < tumParcaciklar.length; n++) {
+                        var nuk = tumParcaciklar[n];
+                        var dx = px - nuk.x;
+                        var dy = py - nuk.y;
+                        toplam += (nuk.r * nuk.r) / (dx * dx + dy * dy + 1);
+                    }
+
+                    var t = (toplam - (ESIK - ESIK_YUMUSAKLIGI)) / (2 * ESIK_YUMUSAKLIGI);
+                    t = t < 0 ? 0 : (t > 1 ? 1 : t);
+                    var alfa = t * t * (3 - 2 * t);
+
+                    veri[idx] = 255;
+                    veri[idx + 1] = 255;
+                    veri[idx + 2] = 255;
+                    veri[idx + 3] = Math.round(alfa * 255);
+                    idx += 4;
+                }
+            }
+
+            kucukBaglam.putImageData(alanVerisi, 0, 0);
+        }
+
+        // 5) Tema: CSS degiskenlerini oku, tek bir gradyan olustur (nukleus basina renk YOK).
+        function gradyanOlustur() {
+            var stil = getComputedStyle(parlama);
+            var renk1 = stil.getPropertyValue("--parlama-1").trim();
+            var renk2 = stil.getPropertyValue("--parlama-2").trim();
+            var renk3 = stil.getPropertyValue("--parlama-3").trim();
+
+            var g = baglam.createLinearGradient(
+                canvas.width * 0.25, canvas.height * 0.25,
+                canvas.width * 0.75, canvas.height * 0.75);
+            g.addColorStop(0, renk1);
+            g.addColorStop(0.55, renk2);
+            g.addColorStop(1, renk3);
+            return g;
+        }
+
+        // Kucuk alan tuvalini (duzgun olceklenerek) gecici tam boy tuvale cizer,
+        // gradyani "source-in" ile o maskenin icinden gecirir, sonra hedefe (ana tuvale)
+        // AYRI, kendi icinde tutarli bir goruntu olarak bindirir - iki gecis birbirine karismaz.
+        function pasoCiz(buyume, bulanikPx, alfa, gradyan) {
+            geciciBaglam.clearRect(0, 0, geciciTuval.width, geciciTuval.height);
+            geciciBaglam.save();
+            if (bulanikPx > 0) {
+                geciciBaglam.filter = "blur(" + bulanikPx + "px)";
+            }
+            geciciBaglam.drawImage(kucukTuval, 0, 0, GRID_W, GRID_H,
+                -buyume / 2, -buyume / 2, canvas.width + buyume, canvas.height + buyume);
+            geciciBaglam.filter = "none";
+            geciciBaglam.globalCompositeOperation = "source-in";
+            geciciBaglam.fillStyle = gradyan;
+            geciciBaglam.fillRect(0, 0, canvas.width, canvas.height);
+            geciciBaglam.restore();
+
+            baglam.save();
+            baglam.globalAlpha = alfa;
+            baglam.drawImage(geciciTuval, 0, 0);
+            baglam.restore();
+        }
+
+        // 6) Render: once kucuk/basit bir parlama gecisi (bulanik, dusuk alfa, hafifce
+        // buyutulmus), sonra tanimli ana govde - ikisi de AYNI alan tuvalinden turetilir.
+        function sivyiCiz() {
+            var gradyan = gradyanOlustur();
+            baglam.clearRect(0, 0, canvas.width, canvas.height);
+            pasoCiz(canvas.width * 0.08, Math.round(canvas.width * 0.03), 0.3, gradyan);
+            pasoCiz(0, 0, 1, gradyan);
+        }
+
+        // 7) Ana dongu: gercek gecen zamana (dt) dayali fizik, #parlama gizliyken atlanir,
+        // pahali alan/render adimi ~30fps'e sinirlanir, fizik ise her kare guncellenir.
+        function dongu(zamanMs) {
+            if (parlama.classList.contains("parlama-gizli")) {
+                sonKareZamani = 0; // gorunur oldugunda dt sicramasi yasanmasin
+                requestAnimationFrame(dongu);
+                return;
+            }
+
+            var dt = sonKareZamani ? (zamanMs - sonKareZamani) / 1000 : 0;
+            dt = Math.min(dt, 0.05);
+            sonKareZamani = zamanMs;
+
+            fizigiGuncelle(zamanMs, dt);
+
+            if (zamanMs - sonAlanZamani >= ALAN_HEDEF_ARALIGI) {
+                sonAlanZamani = zamanMs;
+                alanDegerlendir();
+                sivyiCiz();
+            }
+
+            requestAnimationFrame(dongu);
+        }
+
+        boyutlandir();
+        window.addEventListener("resize", boyutlandir);
+        parcaciklariBaslat();
+        sonrakiUcImpulsu = performance.now() + 1500 + Math.random() * 2000;
+        sonrakiVorteksKontrolu = performance.now() + 1200 + Math.random() * 1500;
+
+        if (azaltilmisHareket) {
+            // Tek, statik bir kare: surekli simulasyon calistirilmaz.
+            fizigiGuncelle(performance.now(), 0);
+            alanDegerlendir();
+            sivyiCiz();
+        } else {
+            requestAnimationFrame(dongu);
+        }
+    })();
+</script>
+
+<script>
+    function parlamayiBalonaTasi(parlama, hedefBalon) {
+        var baslangic = parlama.getBoundingClientRect();
+        var hedef = hedefBalon.getBoundingClientRect();
+
+        var baslangicMerkezX = baslangic.left + baslangic.width / 2;
+        var baslangicMerkezY = baslangic.top + baslangic.height / 2;
+        var hedefMerkezX = hedef.left + hedef.width / 2;
+        var hedefMerkezY = hedef.top + hedef.height / 2;
+
+        parlama.classList.remove("parlama-gizli");
+
+        // Once konumu, mevcut gorsel yeriyle birebir ayni noktaya sabitle
+        // (koordinat sistemi degismeden, sadece absolute -> fixed geciyor).
+        parlama.style.transition = "none";
+        parlama.style.position = "fixed";
+        parlama.style.left = baslangicMerkezX + "px";
+        parlama.style.top = baslangicMerkezY + "px";
+
+        // Baslangic konumunun tarayici tarafindan islenmesini saglamak icin reflow zorla.
+        void parlama.offsetWidth;
+
+        var sure = 750;
+        parlama.style.transition =
+            "top " + sure + "ms cubic-bezier(0.22, 1, 0.36, 1), " +
+            "left " + sure + "ms cubic-bezier(0.22, 1, 0.36, 1)";
+
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                parlama.style.left = hedefMerkezX + "px";
+                parlama.style.top = hedefMerkezY + "px";
+            });
+        });
+
+        var tamamlandi = false;
+        var yedekZamanlayici;
+
+        function geziyiBitir() {
+            if (tamamlandi) {
+                return;
+            }
+            tamamlandi = true;
+            parlama.removeEventListener("transitionend", transitionBitince);
+            clearTimeout(yedekZamanlayici);
+
+            hedefBalon.appendChild(parlama);
+            parlama.style.position = "";
+            parlama.style.top = "";
+            parlama.style.left = "";
+            parlama.style.transition = "";
+            parlama.classList.add("parlama-balonda");
+        }
+
+        function transitionBitince(e) {
+            if (e.target === parlama && (e.propertyName === "top" || e.propertyName === "left")) {
+                geziyiBitir();
+            }
+        }
+
+        parlama.addEventListener("transitionend", transitionBitince);
+        yedekZamanlayici = setTimeout(geziyiBitir, sure + 150);
+    }
+
     document.getElementById("soru-formu").addEventListener("submit", function () {
+        var selamlama = document.getElementById("selamlama");
+        var ilkMesajMi = !!selamlama;
+        if (selamlama) {
+            selamlama.style.display = "none";
+        }
+
         var dugme = document.getElementById("sor-dugmesi");
         dugme.disabled = true;
         dugme.textContent = "Bekleyin...";
@@ -420,15 +868,15 @@
         kutu.appendChild(yaziyorSatiri);
 
         var parlama = document.getElementById("parlama");
-        console.log("[parlama] eleman bulundu mu:", !!parlama);
-        if (parlama) {
-            var yaziyorBalonu = yaziyorSatiri.querySelector(".chat-balon");
-            console.log("[parlama] hedef balon bulundu mu:", !!yaziyorBalonu);
-            if (yaziyorBalonu) {
+        var yaziyorBalonu = yaziyorSatiri.querySelector(".chat-balon");
+
+        if (parlama && yaziyorBalonu) {
+            if (ilkMesajMi) {
+                parlamayiBalonaTasi(parlama, yaziyorBalonu);
+            } else {
                 yaziyorBalonu.appendChild(parlama);
                 parlama.classList.remove("parlama-gizli");
                 parlama.classList.add("parlama-balonda");
-                console.log("[parlama] tasindi, yeni ebeveyn balon mu:", parlama.parentElement === yaziyorBalonu);
             }
         }
 
