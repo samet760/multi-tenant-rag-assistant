@@ -18,7 +18,7 @@
         line-height: 0;
         animation: noktaYanipSon 1.4s infinite ease-in-out both;
         position: relative;
-        z-index: 1;
+        z-index: 2;
     }
 
     .yaziyor-balonu .nokta:nth-child(1) {
@@ -41,7 +41,7 @@
 
     .yaziyor-balonu {
         position: relative;
-        z-index: 0;
+        z-index: 1;
         overflow: visible;
     }
 
@@ -175,6 +175,32 @@
         opacity: 0;
     }
 
+    /* GECICI TANI: collapse'in son kismindan itibaren, TAM temas noktasinda
+       birakilan kucuk "enerji rezervi" - kalici dis yuzey/hale/orb DEGIL,
+       sadece bir sonraki asamada cevre akisinin cikis noktasi olacak, sabit,
+       yumusak bir leke (bkz. JS: temasEnerjisiOlustur). position:fixed -
+       #parlama'nin GECICI temas hesabiyla AYNI viewport koordinat sistemini
+       (getBoundingClientRect) kullanir, balonun kendi ic DOM agacina hic
+       eklenmez (kalici dis yuzeyle KARISTIRILMASIN). */
+    .temas-enerjisi {
+        --temas-1: #fde047;
+        --temas-2: #f97316;
+        position: fixed;
+        z-index: 2;
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        pointer-events: none;
+        opacity: 0;
+        filter: blur(3px);
+        background: radial-gradient(circle, var(--temas-1) 0%, var(--temas-2) 55%, transparent 78%);
+    }
+
+    [data-bs-theme="dark"] .temas-enerjisi {
+        --temas-1: #a78bfa;
+        --temas-2: #7c3aed;
+    }
+
     .parlama-canvas {
         position: absolute;
         inset: 0;
@@ -183,32 +209,287 @@
         display: block;
     }
 
-    #parlama.parlama-balonda {
-        inset: -30%;
-        top: auto;
-        left: auto;
-        width: auto;
-        height: auto;
-        opacity: 0.95;
-        animation: parlamaSalinimKucuk 4s ease-in-out infinite;
+    /* Asama 2: #parlama.parlama-balonda (balonun ICINE kalici, kucuk/donen bir
+       kopya birakan eski FLIP-sonrasi hali) ve @@keyframes parlamaSalinimKucuk
+       KALDIRILDI - "balonun arkasinda kucuk bir Şey kopyasi" fikri terk edildi.
+       Seyahatin sonunda #parlama artik BALONA HIC EKLENMIYOR; tamamen gizlenip
+       (parlama-gizli) yerini asagidaki kabul edilmis hale/tutam sistemi aliyor
+       (bkz. JS: parlamayiBalonaTasi/balonuEtkinlestir). */
+
+    /* Sonraki mesaj yukleme parlaklik efekti (Asama 1, 4. ve son duzeltme): satir
+       duzeyinde konumlandirma TAMAMEN KALDIRILDI - .yaziyor-satiri genisligi (800px'e
+       kadar) balonun kendi genisligiyle AYNI degil (justify-content:start balonu sola
+       yasliyor), bu yuzden satirin %50'si balonun merkeziyle CAKISMIYORDU ve parlama
+       balondan uzakta/kirpilmis gorunuyordu. Cozum: parlaklik artik DOGRUDAN balonun
+       (.yaziyor-balonu) kendi ICINDE, position:absolute + inset ile - otomatik olarak
+       balonu takip eder, hicbir getBoundingClientRect/rect hesabi gerekmez.
+       Sorun: bir cocuk, kendi ebeveyninin arka planinin ONUNE asla gecemez (z-index
+       sadece KARDESLER arasi sirayi belirler) - yani parlaklik balonun ICINDE bir
+       cocuksa, balonun GRI arka planinin ARKASINDA duramaz. Cozum: griyi ".sonraki-hale"
+       balonunun kendisinden .yaziyor-arkaplan adli ayri, ayni boyutta bir "backdrop"
+       katmanina tasidik (bkz. asagi) - boylece ucu: parlaklik (altta) -> backdrop
+       (grinin kendisi, ortada) -> noktalar (ustte), hepsi ayni balonun icinde, KARDES
+       olarak. Balonun kendi kutusu/padding/max-width/genisligi/yuksekligi DEGISMEDI -
+       sadece arka plan RENGI backdrop katmanina tasindi (.balon-cevap DEGISTIRILMEDI,
+       diger tum balonlar etkilenmez). requestAnimationFrame/canvas motoruna hic
+       dokunulmaz - bu tamamen ayri, hafif bir CSS animasyonudur. */
+    /* --yuzey-1/2 burada (balonun kendisinde) tanimlanir, .yaziyor-yuzey'de DEGIL -
+       boylece Asama 3'te eklenen .yaziyor-akis (kardes bir SVG katmani, bkz. asagi)
+       AYNI degiskenleri miras alarak kullanabilir; renkler TEK yerde tanimli kalir,
+       hicbir deger degismedi/kopyalanmadi, sadece tanim yeri tasindi. */
+    .yaziyor-balonu.sonraki-hale {
+        --yuzey-1: 253, 224, 71;
+        --yuzey-2: 249, 115, 22;
+        background-color: transparent;
+        border-color: transparent;
     }
 
-    .parlama-balonda .parlama-canvas {
+    [data-bs-theme="dark"] .yaziyor-balonu.sonraki-hale {
+        --yuzey-1: 167, 139, 250;
+        --yuzey-2: 124, 58, 237;
+    }
+
+    /* Kirpilma duzeltmesi: #mesajKutusu'nun KENDISI DEGISTIRILMEDI (tum sohbetin
+       overflow-y:auto scroll davranisi aynen korunuyor). Sorun sudur: her sonraki
+       mesaj gonderiminde "kutu.scrollTop = kutu.scrollHeight" calisir ve bu satiri
+       (+ onun mb-3 = ~16px marjini) #mesajKutusu'nun GORUNEN kutusunun ALT KIRPMA
+       SINIRINA tam yaslar. Asama 1A'nin kendi degeri (1.5rem) korunuyordu ama Asama
+       1B'nin tutam'lari (bkz. asagi, .yaziyor-tutam) bazen ~20-24px + blur kadar
+       asagi dogru da tasabiliyor - bu yuzden SADECE bu satirin payi 2rem'e
+       cikarildi (Asama 1A halesinin kendi degerleri DEGISMEDI). margin-bottom degil
+       padding-bottom kullanildi: Bootstrap'in .mb-3 sinifi !important kullaniyor,
+       margin-bottom onu ezemezdi. */
+    .yaziyor-satiri.sonraki-hale {
+        padding-bottom: 2rem;
+    }
+
+    /* Tamamlanmis dis enerji yuzeyi: balonun YUVARLATILMIS silueti boyunca ince,
+       "doldurulmus bir kanal" hissi veren yakin bir katman. background YOK -
+       yalnizca box-shadow kullanildi, cunku box-shadow HER ZAMAN border-radius'u
+       (burada inherit ile balonun kendi 1.25rem'i) birebir takip eder; bu yuzden
+       koseler dahil tum cevre dogal olarak yuvarlak kalir, dortgen bir parlama
+       asla olusmaz. Dort ust uste binen golge katmani KASITLI OLARAK simetrik
+       DEGIL (farkli x/y kaymalari + iki farkli renk) - tek duz/esit bir cizgi
+       yerine hafif organik, bolgeden bolgeye yogunlugu degisen bir gorunum verir.
+       Hicbir katmanin blur'u 0 DEGIL (ilk katman haric, o da opaklik ~0.2 ile
+       kasitli olarak cok zayif) - bu yuzden sonuc bir "kenarlik/neon cizgi" degil,
+       yumusak bir isik olarak okunur. z-index:0, .yaziyor-parlak/.yaziyor-tutam
+       ile AYNI katmanda ama DOM'da onlardan SONRA (bkz. JS) - boylece hem onlarin
+       UZERINDE gorunur (daha "yakin/yogun" hissi) hem de aktif bir tutam, koku bu
+       yuzeyin hemen altindan/icinden cikiyormus gibi gorunur. Griyi tasiyan
+       backdrop (z-index:1) hala ONUNDE durur; box-shadow zaten yalnizca kutunun
+       DISINA cizildigi icin balonun ic gorunumune hicbir sekilde karismaz. */
+    .yaziyor-yuzey {
+        position: absolute;
+        inset: -1px;
+        z-index: 0;
+        pointer-events: none;
+        border-radius: inherit;
+        box-shadow:
+            0 0 0 1px rgba(var(--yuzey-1), 0.2),
+            -1px 1px 3px 0 rgba(var(--yuzey-1), 0.5),
+            1.5px -1px 4px 0.5px rgba(var(--yuzey-2), 0.42),
+            0 1.5px 6px 1px rgba(var(--yuzey-2), 0.26);
+    }
+
+    /* MIMARI - ilk mesajin KALICI cevre yuzeyi: SADECE ilk mesaj gecisinde,
+       calisma-zamaninda eklenir (bkz. JS: cevreAkisiKur/cevreAkisiCalistir).
+       Sonraki mesajlarda bu SVG hic olusturulmaz. DORT <rect>, balonun
+       GERCEK olcusune/kose yaricapina gore JS'ten kurulur - ikisi "govde/iz"
+       (yaziyor-akis-yol: temas noktasindan buyuyen, YUMUSAK/soluk dolu kisim -
+       BU KATMAN ARTIK KALICI: %100 dolunca hicbir zaman soldurulmez/
+       kaldirilmaz, ilk mesajin nihai dis derisi olarak KALIR), ikisi "uc"
+       (yaziyor-akis-uc: govdenin o anki HAREKETLI ucunu takip eden, KISA/daha
+       parlak bir segment - "akan enerjinin nerede oldugunu" okunakli kilmak
+       icin; akis tamamlanmadan hemen once SONER, govde/iz'in duz nihai
+       gorunumune karisir). stroke-dasharray/-dashoffset Element.animate() ile
+       canlandirilir. overflow:visible ZORUNLU - SVG'nin varsayilani
+       "hidden"dir, aksi halde blur/stroke tasan kisimlari kirpilirdi. Renk/
+       kalinlik degerleri .yaziyor-yuzey'in (sonraki mesajlarda kullanilan,
+       DEGISMEYEN box-shadow katmani) ince/yumusak/kisitli gorunumune
+       YAKINLASTIRILDI - amac: akis tamamlaninca gorunumun .yaziyor-yuzey'den
+       fark edilemeyecek kadar yakin olmasi, cunku artik BASKA BIR KATMANA
+       "devredilmiyor" - bu govde/iz'in kendisi ilk mesajin nihai gorunumu
+       oluyor. */
+    .yaziyor-akis {
+        position: absolute;
+        inset: -1px;
+        z-index: 1;
+        pointer-events: none;
+        overflow: visible;
+    }
+
+    .yaziyor-akis-yol {
+        fill: none;
+        stroke-width: 2px;
+        stroke-linecap: round;
+        stroke-dasharray: 0px 1px;
+        filter: blur(2.5px);
+    }
+
+    .yaziyor-akis-cw {
+        stroke: rgba(var(--yuzey-1), 0.55);
+    }
+
+    .yaziyor-akis-ccw {
+        stroke: rgba(var(--yuzey-2), 0.55);
+    }
+
+    .yaziyor-akis-uc {
+        fill: none;
+        stroke-width: 4.5;
+        stroke-linecap: round;
+        stroke-dasharray: 0px 1px;
         filter: blur(1px);
     }
 
-    @@keyframes parlamaSalinimKucuk {
-        0%, 100% {
-            transform: rotate(-6deg);
+    .yaziyor-akis-uc-cw {
+        stroke: rgba(var(--yuzey-1), 1);
+    }
+
+    .yaziyor-akis-uc-ccw {
+        stroke: rgba(var(--yuzey-2), 1);
+    }
+
+    .yaziyor-arkaplan {
+        position: absolute;
+        inset: -1px; /* .balon-cevap'in 1px border'i artik seffaf - orijinal kenari birebir tutmak icin telafi */
+        z-index: 1;
+        border-radius: inherit;
+        background-color: var(--bs-tertiary-bg);
+        border: 1px solid var(--bs-border-color);
+        pointer-events: none;
+    }
+
+    /* Parlak katman (Asama 1A, boyut/yogunluk ayari): balonun disina yalnizca ~8px
+       tasar (once 28px'ti - "kucuk bulut" gibi gorunuyordu), hafif blur(6px) ile
+       en guclu gorunur parilti kenardan ~5-10px, belli belirsiz sonme ~15-18px'te
+       tamamlanir. Backdrop'un (z-index:1) ALTINDA (z-index:0) kalir - bu yuzden
+       sadece balonun kenarlarindan tasan kismi gorunur, merkezi (guclu renk)
+       backdrop tarafindan tamamen ortulur. Uc ayri, kisa mesafede sonen
+       radial-gradient lobu (primer menekse, ikincil mor, hafif mavi-menekse) =
+       tek bir katı daire/halka degil, balona SIKICA yapisik, dagitik bir isik.
+       Opaklik dusurulmedi (0.58->0.62) - kucuk alan kucuk gorunse de renk hala
+       belirgin kalsin diye; kuculme TAMAMEN alan/blur/olcek/kayma degerlerinden. */
+    .yaziyor-parlak {
+        --hale-1: #fbbf24;
+        --hale-2: #fb923c;
+        --hale-3: #ef4444;
+        position: absolute;
+        inset: -8px;
+        z-index: 0;
+        pointer-events: none;
+        filter: blur(6px);
+        opacity: 0.62;
+        background:
+            radial-gradient(circle at 32% 60%, var(--hale-1) 0%, transparent 46%),
+            radial-gradient(circle at 70% 36%, var(--hale-2) 0%, transparent 48%),
+            radial-gradient(circle at 50% 76%, var(--hale-3) 0%, transparent 52%);
+        animation: parlakSuzulme 7.5s ease-in-out infinite;
+    }
+
+    [data-bs-theme="dark"] .yaziyor-parlak {
+        --hale-1: #7c3aed;
+        --hale-2: #9333ea;
+        --hale-3: #4f46e5;
+    }
+
+    /* Duzensiz, esit-olmayan zaman noktalari (%14, %32, %51, %69, %86) kasitli -
+       simetrik bir "nefes alma"/pulse hissi vermesin. Surukleme araligi daraltildi
+       (once ~ -9px..10px yatay/-8px..8px dikey idi -> simdi ~ -5px..5px yatay/
+       -4px..4px dikey) ve scale sapmasi da daraltildi (once ~%6-9 -> simdi ~%3-5)
+       - hale artik balona SIKICA yapisik kalirken yine de goze carpar sekilde
+       suzuluyor. background-position kaymalari da orantili olarak kucultuldu.
+       100% ve 0% AYNI degerler - donguyu goze carpan bir sicrama olmadan kapatir. */
+    @@keyframes parlakSuzulme {
+        0% {
+            transform: translate(-2px, 2px) scale(1.015, 0.985);
+            background-position: 0% 0%, 0% 0%, 0% 0%;
+            opacity: 0.6;
         }
 
-        50% {
-            transform: rotate(6deg);
+        14% {
+            transform: translate(-5px, -1px) scale(0.975, 1.03);
+            background-position: -5% 3%, 4% -4%, -3% 3%;
+            opacity: 0.76;
+        }
+
+        32% {
+            transform: translate(3px, -4px) scale(1.045, 0.965);
+            background-position: 5% -4%, -4% 4%, 4% -2%;
+            opacity: 0.68;
+        }
+
+        51% {
+            transform: translate(5px, 3px) scale(0.965, 1.05);
+            background-position: 3% 4%, -5% -1%, 2% 4%;
+            opacity: 0.82;
+        }
+
+        69% {
+            transform: translate(5px, 2px) scale(1.035, 0.985);
+            background-position: 4% 2%, 3% 3%, -3% -2%;
+            opacity: 0.64;
+        }
+
+        86% {
+            transform: translate(-4px, -3px) scale(0.98, 1.025);
+            background-position: -3% -4%, -2% 4%, 4% -1%;
+            opacity: 0.78;
+        }
+
+        100% {
+            transform: translate(-2px, 2px) scale(1.015, 0.985);
+            background-position: 0% 0%, 0% 0%, 0% 0%;
+            opacity: 0.6;
         }
     }
 
+    /* Asama 1B/1C - plazma tutamlari: halenin (.yaziyor-parlak) KENDISI
+       DEGISTIRILMEDI (boyut/renk/yogunluk/surukleme aynen Asama 1A'daki gibi). Uc
+       YENIDEN KULLANILABILIR "tutam" katmani var - ARTIK SABIT bir @@keyframes
+       koreografisi YOK (Asama 1B'de vardi, tekrar eden/tahmin edilebilir oldugu
+       icin Asama 1C'de kaldirildi). Konum/boyut/gradyan/yon/sure/gecikme artik
+       JS tarafindan HER olayda yeniden rastgelestirilir (bkz. asagi,
+       yaziyorTutamlariBaslat, Element.animate() ile). Bu kural sadece PAYLASILAN,
+       degismeyen temelleri tasir: mutlak konumlandirma, blur, baslangic opakligi
+       (0 = havuzda beklerken gorunmez), daire/elips serbestligi icin border-radius,
+       ve tema-duyarli renk degiskenleri (JS bunlari getComputedStyle ile okur, boylece
+       renk mantigi TEK yerde/CSS'te kalir). Hepsi ayni z-index:0 katmaninda
+       (.yaziyor-parlak ile ayni seviye, backdrop'un/noktalarin HALA gerisinde) -
+       stacking mimarisi Asama 1A'dakiyle birebir ayni. */
+    .yaziyor-tutam {
+        --tutam-1: #fde047;
+        --tutam-2: #fb923c;
+        position: absolute;
+        z-index: 0;
+        pointer-events: none;
+        filter: blur(5px);
+        opacity: 0;
+        border-radius: 50%;
+        will-change: transform, opacity;
+    }
+
+    [data-bs-theme="dark"] .yaziyor-tutam {
+        --tutam-1: #a78bfa;
+        --tutam-2: #7c3aed;
+    }
+
+    /* Asama 2: sadece ILK mesaj gecisinde, balonuEtkinlestir() tarafindan
+       calisma-zamaninda eklenen sarmalayici. .yaziyor-parlak/.yaziyor-tutam'in
+       KENDI opacity/transform'u zaten kendi animasyonlariyla (parlakSuzulme,
+       Element.animate() tutam olaylari) surekli degistigi icin, carprazlama
+       (0 -> 1) icin AYRI bir katman gerekiyor - dogrudan onlarin opacity'sine bir
+       transition eklemek, calisan animasyonlarla yarisir ve gorunmez kalirdi.
+       position YOK (statik) - bu yuzden icindeki position:absolute katmanlarin
+       containing block'u degismez, hala .yaziyor-balonu'dur (Asama 1A/1C'deki
+       gibi). Sonraki mesajlarda bu sarmalayici hic kullanilmaz/eklenmez. */
+    .yaziyor-enerji {
+        pointer-events: none;
+    }
+
     @@media (prefers-reduced-motion: reduce) {
-        #parlama.parlama-balonda {
+        .yaziyor-parlak {
             animation: none;
         }
     }
@@ -963,7 +1244,65 @@
 </script>
 
 <script>
-    function parlamayiBalonaTasi(parlama, hedefBalon) {
+    // GECICI TANI: temas noktasinda birakilan kucuk "enerji rezervi"
+    // elemanini olusturur ve (0.55 -> 1 olcek, 0 -> 1 opaklik) yumusakca
+    // belirmesini saglar - SONRA HICBIR SEKILDE gizlenmez/kaldirilmaz (bu
+    // asama icin kalici kalmasi istendi). Renkler JS'te SABITLENMEZ - CSS
+    // (.temas-enerjisi / [data-bs-theme=dark] .temas-enerjisi) tema-duyarli
+    // --temas-1/--temas-2 degiskenlerini zaten tasir, bu yuzden burada
+    // sadece konum/boyut/animasyon islenir.
+    function temasEnerjisiOlustur(x, y, sure) {
+        var el = document.createElement("span");
+        el.className = "temas-enerjisi";
+        el.setAttribute("aria-hidden", "true");
+        el.style.left = x + "px";
+        el.style.top = y + "px";
+        document.body.appendChild(el);
+
+        if (!el.animate) {
+            el.style.opacity = "1";
+            el.style.transform = "translate(-50%, -50%) scale(1)";
+            return el;
+        }
+
+        el.animate(
+            [
+                { transform: "translate(-50%, -50%) scale(0.55)", opacity: 0 },
+                { transform: "translate(-50%, -50%) scale(1)", opacity: 1 }
+            ],
+            { duration: sure, easing: "ease-out", fill: "forwards" }
+        );
+        return el;
+    }
+
+    // Buyuk merkezi Şey'i TEK, surekli bir WAAPI animasyonuyla (konum + olcek +
+    // opaklik AYNI kare dizisinde) yukleme balonunun GERCEK yuvarlatilmis
+    // yuzeyindeki EN YAKIN temas noktasina tasir; TEMAS ANINDA (pTemas =
+    // seyahatSure) hem collapse baslar hem de AYNI anda cevre akisi
+    // (cevreAkisiKur ile EN BASTA kurulmus akis nesnesi, yeniden
+    // hesaplanmadan) tetiklenir - ikisi 160ms boyunca ORTUSUR. Akis, s0'dan
+    // saat yonu + saat yonunun tersine IKI cephe (govde/iz BUYUR, "uc"
+    // katmanlari daha parlak/HAREKETLI iki uc olarak govdenin onunde kosar)
+    // balonun karsi noktasinda bulusur, hale (enerjiKatmaniniEkle/
+    // enerjiyiCrossfadeEt) fillSuresi'nin son %20'sinde normal siddetine
+    // ulasir, temas rezervi (temasEnerjisiOlustur) akisla senkron dogar ve
+    // hizla soner, akis tamamlaninca (fillSuresi sonunda) rastgele tutamlar
+    // (yaziyorTutamlariBaslat) baslar - hicbir ayri "final skin" katmani
+    // eklenmez.
+    function parlamayiBalonaTasi(parlama, hedefBalon, satir) {
+        var azaltilmisHareket = window.matchMedia &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        if (azaltilmisHareket) {
+            // Hareketi azalt tercih edilmisse seyahat/temas/akis gorseli YOK -
+            // dogrudan gizle, ama kabul edilmis SON DURUMA (kalici dis yuzey +
+            // hale + tutam) yine de gec - reduced-motion kullanicisi sonsuza
+            // kadar "cikri" bir yaziyor balonunda kalmasin.
+            parlama.classList.add("parlama-gizli");
+            balonuEtkinlestir(hedefBalon, satir);
+            return;
+        }
+
         var baslangic = parlama.getBoundingClientRect();
         var hedef = hedefBalon.getBoundingClientRect();
 
@@ -972,57 +1311,657 @@
         var hedefMerkezX = hedef.left + hedef.width / 2;
         var hedefMerkezY = hedef.top + hedef.height / 2;
 
+        // Disariya dogru birim normal: balon merkezinden, Şey'in GELDIGI yone.
+        var yonX = baslangicMerkezX - hedefMerkezX;
+        var yonY = baslangicMerkezY - hedefMerkezY;
+        var yonUzunluk = Math.sqrt(yonX * yonX + yonY * yonY) || 1;
+        yonX /= yonUzunluk;
+        yonY /= yonUzunluk;
+
+        // Balonun GERCEK yuvarlatilmis yuzeyindeki en yakin temas noktasi
+        // (mevcut, sayisal getPointAtLength hesabi - DEGISMEDI). Cevre akis
+        // SVG'si burada EN BASTA kurulur (henuz gorunmez - .yaziyor-akis-yol'un
+        // dinlenme hali stroke-dasharray:0px 1px) ve ARTIK ERKEN KALDIRILMIYOR -
+        // collapse bitince AYNI akis nesnesi (s0/temasX/temasY DAHIL) asagida
+        // cevreAkisiCalistir'e verilecek. Boylece iki yonlu akisin baslangic
+        // noktasi, Şey'in temas/collapse icin kullandigi noktayla PIKSEL PIKSEL
+        // AYNI olur - ikinci bir hesaplama YOK, sicrama YOK.
+        var akis = cevreAkisiKur(hedefBalon, hedef, yonX, yonY);
+
+        // IDLE_GORUNUR_PX: #parlama 300x300px'lik bir sunum kutusu ama bu
+        // kutunun BUYUK KISMI seffaf bosluktur - fiziksel olarak "govde"
+        // sayilan tek sey merkezi cekirdektir (bkz. parcaciklariBaslat:
+        // "cekirdek = parcacikOlustur(..., w * 0.17, 'cekirdek')", w=alanW,
+        // alanW #parlama'nin clientWidth'ine (300px) 1:1 karsilik gelir -
+        // devicePixelRatio hem fizik uzayina hem tuval CSS boyutuna ayni
+        // oranda uygulandigi icin birbirini goturur). Yani idle/scale-1
+        // durumunda GERCEKTEN goze carpan/"katı" govde capi yaklasik
+        // 2 * 0.17 * 300 = 102px'tir - 300px DEGIL. Onceki hata BUNU
+        // gormezden gelip dogrudan 300px'ten olcek turetmekti (30/300=0.10),
+        // bu da cekirdegi ezip tandrilleri (ince flamalari) gorunmez
+        // kilarak Şey'i "kucuk yuvarlak nokta"ya indirgiyordu.
+        var IDLE_GORUNUR_PX = 2 * 0.17 * 300;
+
+        // ONCEKI_TEMAS_OLCEGI: bir onceki tani asamasinin temas olcegi
+        // (45px hedef / IDLE_GORUNUR_PX). YENI bir 300px/footprint olcum
+        // sistemi ICAT EDILMEDI - MEVCUT bu olcek, asagida SADECE bir
+        // carpanla kucultuluyor.
+        var ONCEKI_HEDEF_GORUNUR_PX = 45;
+        var ONCEKI_TEMAS_OLCEGI = ONCEKI_HEDEF_GORUNUR_PX / IDLE_GORUNUR_PX;
+
+        // KUCULTME_ORANI: mevcut temas olcegini %55-65 araligina indirger -
+        // muhafazakar/orta bir deger (0.60): hem "kucuk yuvarlak nokta"ya
+        // donme riskini (asiri kucultme) hem yetersiz kucultme riskini
+        // dengeler.
+        var KUCULTME_ORANI = 0.60;
+        var temasOlcegi = ONCEKI_TEMAS_OLCEGI * KUCULTME_ORANI;
+
+        // govdeYaricapi(olcek): verilen olcekte GERCEKTEN gorunur yaricap
+        // (IDLE_GORUNUR_PX ile AYNI oranti korunarak). Hem temas anindaki
+        // hem de (daha kucuk) collapse yaricaplari icin kullanilir - govde
+        // HANGI olcekte olursa olsun, balona-BAKAN kenari boylece HER ZAMAN
+        // matematiksel olarak ayni temas noktasinda kalir (dx/dy = temasDx/Y
+        // + yon * govdeYaricapi(olcek); kenar = merkez - yon*yaricap =
+        // temas noktasi, SABIT - olcek ne olursa olsun sadelesir).
+        function govdeYaricapi(olcek) {
+            return IDLE_GORUNUR_PX * olcek / 2;
+        }
+        var temasYaricapi = govdeYaricapi(temasOlcegi);
+
+        var temasDx = akis.temasX - baslangicMerkezX;
+        var temasDy = akis.temasY - baslangicMerkezY;
+        var dx = temasDx + yonX * temasYaricapi;
+        var dy = temasDy + yonY * temasYaricapi;
+        var mesafe = Math.sqrt(dx * dx + dy * dy);
+
+        var seyahatSure = Math.max(650, Math.min(950, 650 + mesafe * 0.35));
+
+        // Collapse: temastan HEMEN sonra baslayan, 130-190ms araliginda kisa
+        // bir faz (160ms - araligin ortasi). toplamSure = seyahat + collapse;
+        // pTemas, kare dizisindeki seyahat-fazi offsetlerini (0..pTemas) TEK,
+        // surekli animasyonun toplam suresine gore yeniden olcekler.
+        var collapseSure = 160;
+        var toplamSure = seyahatSure + collapseSure;
+        var pTemas = seyahatSure / toplamSure;
+
+        // Teget yonu: rotate(tegetAci) scale(sx,sy) rotate(-tegetAci) deseni
+        // icin - bu rotasyondan SONRA sy ekseni disariya-dogru normal (yon)
+        // ile hizalanir (asagidaki govdeYaricapi cagrilari HEP sy'ye gore
+        // hesaplanir). Onceden kabul edilmis AYNI formul - collapse fazinda
+        // yeniden kullanildi, yeniden icat edilmedi.
+        var tegetAci = Math.atan2(yonX, -yonY) * 180 / Math.PI;
+
+        // Collapse karesi (orta): govde balona-BAKAN NOKTAYA dogru "tutunumu
+        // kaybetmeye" baslar - normal eksen (sy) teget eksenden (sx) daha
+        // hizli kucculur, opaklik dusmeye baslar. Ikisi de temasOlcegi'nin
+        // ALTINDA kalir (asla buyumez, uzun oval olmaz).
+        var syOrta = temasOlcegi * 0.55;
+        var sxOrta = temasOlcegi * 0.85;
+        var dxOrta = temasDx + yonX * govdeYaricapi(syOrta);
+        var dyOrta = temasDy + yonY * govdeYaricapi(syOrta);
+
+        // Collapse karesi (son): govde neredeyse tamamen temas noktasina
+        // gomulur (derin normal-eksen sikismasi) ve opaklik 0'a duser.
+        var sySon = temasOlcegi * 0.12;
+        var sxSon = temasOlcegi * 0.35;
+        var dxSon = temasDx + yonX * govdeYaricapi(sySon);
+        var dySon = temasDy + yonY * govdeYaricapi(sySon);
+
         parlama.classList.remove("parlama-gizli");
 
-        // Once konumu, mevcut gorsel yeriyle birebir ayni noktaya sabitle
-        // (koordinat sistemi degismeden, sadece absolute -> fixed geciyor).
+        // Once, gorunen konumuyla BIREBIR ayni noktaya sabitleyerek absolute'tan
+        // fixed'e gec (koordinat sistemi degismez, sicrama olmaz).
         parlama.style.transition = "none";
         parlama.style.position = "fixed";
-        parlama.style.left = baslangicMerkezX + "px";
         parlama.style.top = baslangicMerkezY + "px";
+        parlama.style.left = baslangicMerkezX + "px";
+        parlama.style.zIndex = "3";
 
-        // Baslangic konumunun tarayici tarafindan islenmesini saglamak icin reflow zorla.
-        void parlama.offsetWidth;
+        // 1 -> temasOlcegi arasinda yumusak kuculme (seyahat fazi, DEGISMEDI -
+        // sadece offsetleri pTemas ile yeniden olceklendi).
+        function olcekAra(f) {
+            return 1 - (1 - temasOlcegi) * f;
+        }
 
-        var sure = 750;
-        parlama.style.transition =
-            "top " + sure + "ms cubic-bezier(0.22, 1, 0.36, 1), " +
-            "left " + sure + "ms cubic-bezier(0.22, 1, 0.36, 1)";
+        var kareler = [
+            { transform: "translate(-50%, -50%) translate(0px, 0px) scale(1, 1)", opacity: 1, offset: 0 },
+            { transform: "translate(-50%, -50%) translate(" + (dx * 0.5) + "px, " + (dy * 0.5) + "px) scale(" + olcekAra(0.5) + ", " + olcekAra(0.5) + ")", opacity: 1, offset: pTemas * 0.5 },
+            { transform: "translate(-50%, -50%) translate(" + (dx * 0.88) + "px, " + (dy * 0.88) + "px) scale(" + olcekAra(0.88) + ", " + olcekAra(0.88) + ")", opacity: 1, offset: pTemas * 0.88 },
+            { transform: "translate(-50%, -50%) translate(" + dx + "px, " + dy + "px) scale(" + temasOlcegi + ", " + temasOlcegi + ")", opacity: 1, offset: pTemas },
+            { transform: "translate(-50%, -50%) translate(" + dxOrta + "px, " + dyOrta + "px) rotate(" + tegetAci + "deg) scale(" + sxOrta + ", " + syOrta + ") rotate(" + (-tegetAci) + "deg)", opacity: 0.4, offset: pTemas + (1 - pTemas) * 0.55 },
+            { transform: "translate(-50%, -50%) translate(" + dxSon + "px, " + dySon + "px) rotate(" + tegetAci + "deg) scale(" + sxSon + ", " + sySon + ") rotate(" + (-tegetAci) + "deg)", opacity: 0, offset: 1 }
+        ];
 
-        requestAnimationFrame(function () {
-            requestAnimationFrame(function () {
-                parlama.style.left = hedefMerkezX + "px";
-                parlama.style.top = hedefMerkezY + "px";
-            });
+        // Seyahat + temas + KISA collapse TEK bir WAAPI animasyonunda oynar
+        // (fill:"forwards" son kareyi - opacity 0, temas noktasina gomulu
+        // govde - kalici tutar). toplamSure aninda Şey'in animasyonu biter;
+        // asagidaki cevre-akisi/hale/rezerv-sonumu de AYNI ana (toplamSure)
+        // gore zamanlanir - bu YUZDEN "collapse biter bitmez" akis baslar.
+        // Gercek POST navigasyonu (form submit zaten engellenmiyor) sayfayi
+        // normal sekilde degistirecek; burada yapay bir gecikme eklenmedi.
+        parlama.animate(kareler, {
+            duration: toplamSure,
+            easing: "cubic-bezier(0.33, 0, 0.2, 1)",
+            fill: "forwards"
         });
 
-        var tamamlandi = false;
-        var yedekZamanlayici;
+        // fillSuresi (650-850ms hedefinin ortasina yakin) - cevre yuzeyinin
+        // %0'dan %100'e dolma suresi. DEGISMEDI.
+        var fillSuresi = 750;
 
-        function geziyiBitir() {
-            if (tamamlandi) {
+        // Akis, toplamSure (collapse BITISI) yerine seyahatSure'de (Şey'in
+        // balona GERCEKTEN degdigi an - kareler dizisindeki pTemas offset'i)
+        // baslar. Collapse (pTemas..1 arasi, 160ms) akisin ilk 160ms'siyle
+        // ORTUSUR - Şey collapse olurken cepheler ZATEN ayrilmaya baslamis
+        // olur. Collapse'in kendi suresi/geometrisi/transform'lari DEGISMEDI.
+        setTimeout(function () {
+            // Griyi tasiyan zemin (.yaziyor-arkaplan) + --yuzey-1/2 renk
+            // degiskenlerini acan .sonraki-hale sinifi BURADA, akis
+            // baslamadan HEMEN once devreye girer - .yaziyor-akis-cw/ccw'nin
+            // stroke rengi (rgba(var(--yuzey-1),...)) BU SINIF OLMADAN
+            // GECERSIZDIR. .yaziyor-yuzey EKLENMEZ - ilk mesajda kalici dis
+            // yuzey rolunu artik asagida buyuyen SVG'nin KENDISI ustlenir.
+            // Renkler/gorunum ONCEKI (balon-cevap) ile BIREBIR AYNI
+            // oldugundan bu gecis GORSEL OLARAK SESSIZDIR.
+            ilkMesajZeminEtkinlestir(hedefBalon, satir);
+
+            // Hale (.yaziyor-parlak/.yaziyor-tutam): akisin ILK ~%80'INDE HIC
+            // EKLENMEZ (tamamen etkisiz/yok) - cevre insasi izlenirken genel
+            // bir mor pus balonun tamamini KAPLAMAZ. Akisin SON %20'sinde
+            // eklenip carprazlanir, akis tamamlandigi anda kabul edilmis
+            // normal siddetine ulasir. Fonksiyonlarin KENDISI DEGISMEDI
+            // (enerjiKatmaniniEkle/enerjiyiCrossfadeEt).
+            setTimeout(function () {
+                var enerji = enerjiKatmaniniEkle(hedefBalon);
+                enerjiyiCrossfadeEt(enerji, Math.round(fillSuresi * 0.20));
+            }, Math.round(fillSuresi * 0.80));
+
+            // Temas rezervi akisla TAM AYNI anda (senkron) olusturulur -
+            // cepheler ayrilir ayrilmaz rezerv hemen sonmeye baslar (kisa bir
+            // "el degistirme" - uzun sureli yuvarlak mor nokta YOK). Kendi
+            // fade-in'i (collapseSure*0.5) ile beliriyor, HEMEN ardindan
+            // asagidaki sonme animasyonu (%15'te ~0.30, %32'de 0) UZERINE
+            // biner - ikisinin baslangic degeri (opacity:1) AYNI oldugundan
+            // gorsel sicrama olmaz.
+            var temasEnerjisiEl = temasEnerjisiOlustur(akis.temasX, akis.temasY, Math.round(collapseSure * 0.5));
+            if (temasEnerjisiEl && temasEnerjisiEl.animate) {
+                temasEnerjisiEl.animate(
+                    [
+                        { opacity: 1, offset: 0 },
+                        { opacity: 0.3, offset: 0.15 },
+                        { opacity: 0, offset: 0.32 },
+                        { opacity: 0, offset: 1 }
+                    ],
+                    { duration: fillSuresi, easing: "ease-in", fill: "forwards" }
+                );
+            }
+
+            // Iki yonlu, KALICI cevre yuzeyi (cwYol/ccwYol - asagida
+            // cevreAkisiCalistir) - AYNI s0'dan baslar, s0 + uzunluk/2'de
+            // geometrik olarak KESIN bulusur ve BUYUYEN GEOMETRININ KENDISI
+            // (SVG hicbir zaman kaldirilmadan/degistirilmeden) ilk mesajin
+            // kalici dis derisi olarak kalir. Tamamlaninca SADECE rastgele
+            // tutam zamanlayicisi baslar - kabul edilmis
+            // yaziyorTutamlariBaslat, DEGISMEDI - baska hicbir katman/switch
+            // eklenmez.
+            cevreAkisiCalistir(akis, fillSuresi, function () {
+                var tutamDurdur = yaziyorTutamlariBaslat(hedefBalon);
+                window.addEventListener("pagehide", tutamDurdur, { once: true });
+            });
+        }, Math.round(seyahatSure));
+    }
+
+    // GECICI TANI DEGIL - ilk mesaj icin KALICI: griyi tasiyan zemini
+    // (.yaziyor-arkaplan) ve --yuzey-1/2 renk degiskenlerini acan
+    // .sonraki-hale sinifini etkinlestirir - balonuEtkinlestir'in AKSINE
+    // .yaziyor-yuzey EKLEMEZ (ilk mesajda o rolu buyuyen cevre-akis SVG'si
+    // ustlenir - bkz. yukaridaki parlamayiBalonaTasi). Guvenlik agi: zemin
+    // zaten varsa (ikinci cagri) hicbir sey yapmaz.
+    function ilkMesajZeminEtkinlestir(balon, satir) {
+        if (balon.querySelector(".yaziyor-arkaplan")) {
+            return;
+        }
+        balon.classList.add("sonraki-hale");
+        if (satir) {
+            satir.classList.add("sonraki-hale");
+        }
+        balon.insertAdjacentHTML("afterbegin", '<span class="yaziyor-arkaplan" aria-hidden="true"></span>');
+    }
+
+    // Balonun GERCEK yuvarlatilmis silueti icin gecici bir SVG izleyici kurar ve
+    // verilen (yonX,yonY) disa-dogru yonune EN UZAK (yani Şey'in geldigi tarafa
+    // en yakin) sinir noktasini, SVG'nin kendi getPointAtLength'i ile SAYISAL
+    // olarak orneklem alarak bulur - elle yazilmis kose/kenar geometrisi
+    // formullerine gerek yok, tarayicinin kendi dogru yol hesaplamasina guvenilir.
+    // DORT AYNI geometrili <rect> olusturulur: iki "govde/iz" (yol) + iki "uc"
+    // (parlak, hareketli baslik) - hepsi cevreAkisiCalistir tarafindan yeniden
+    // kullanilir (yeniden olusturulmaz).
+    function cevreAkisiKur(balon, dikdortgen, yonX, yonY) {
+        var w = dikdortgen.width, h = dikdortgen.height;
+        var r = parseFloat(getComputedStyle(balon).borderTopLeftRadius) || 0;
+        r = Math.max(0, Math.min(r, w / 2 - 1, h / 2 - 1));
+        var gecOznitelik = 'x="1.5" y="1.5" width="' + Math.max(0, w - 3) +
+            '" height="' + Math.max(0, h - 3) + '" rx="' + r + '" ry="' + r + '"';
+
+        balon.insertAdjacentHTML("afterbegin",
+            '<svg class="yaziyor-akis" aria-hidden="true" width="' + w + '" height="' + h +
+            '" viewBox="0 0 ' + w + ' ' + h + '">' +
+            '<rect class="yaziyor-akis-yol yaziyor-akis-ccw" ' + gecOznitelik + '></rect>' +
+            '<rect class="yaziyor-akis-yol yaziyor-akis-cw" ' + gecOznitelik + '></rect>' +
+            '<rect class="yaziyor-akis-uc yaziyor-akis-uc-ccw" ' + gecOznitelik + '></rect>' +
+            '<rect class="yaziyor-akis-uc yaziyor-akis-uc-cw" ' + gecOznitelik + '></rect>' +
+            '</svg>');
+
+        var svg = balon.querySelector(".yaziyor-akis");
+        var cwYol = balon.querySelector(".yaziyor-akis-cw");
+        var ccwYol = balon.querySelector(".yaziyor-akis-ccw");
+        var cwUc = balon.querySelector(".yaziyor-akis-uc-cw");
+        var ccwUc = balon.querySelector(".yaziyor-akis-uc-ccw");
+        var uzunluk = cwYol.getTotalLength ? cwYol.getTotalLength() : 0;
+
+        var merkezX = w / 2, merkezY = h / 2;
+        var enIyiS = 0, enIyiDeger = -Infinity, enIyiNokta = { x: w, y: h / 2 };
+        var ORNEK = 96;
+        for (var i = 0; i < ORNEK && uzunluk > 0; i++) {
+            var s = (i / ORNEK) * uzunluk;
+            var p = cwYol.getPointAtLength(s);
+            var deger = (p.x - merkezX) * yonX + (p.y - merkezY) * yonY;
+            if (deger > enIyiDeger) {
+                enIyiDeger = deger;
+                enIyiS = s;
+                enIyiNokta = p;
+            }
+        }
+
+        return {
+            svg: svg,
+            cwYol: cwYol,
+            ccwYol: ccwYol,
+            cwUc: cwUc,
+            ccwUc: ccwUc,
+            uzunluk: uzunluk,
+            s0: enIyiS,
+            temasX: dikdortgen.left + enIyiNokta.x,
+            temasY: dikdortgen.top + enIyiNokta.y
+        };
+    }
+
+    // Temas noktasindan IKI yonde (saat yonu / saat yonunun tersine) esit hizda
+    // buyuyen iki stroke-dasharray/-dashoffset animasyonu baslatir (govde/iz).
+    // cwYol ve ccwYol GEOMETRIK OLARAK OZDES kapali bir yolu paylastigi icin,
+    // ikisinin de YARISINI (uzunluk/2) cizmesi otomatik olarak TAM CEVREYI
+    // kapatir ve iki cephe, ayrica hesaplanmasi gerekmeyen, geometrik olarak
+    // KESIN karsi noktada (s0 + uzunluk/2) bulusur.
+    //
+    // MIMARI: bu SVG GECICI BIR IZLEYICI DEGIL. cwYol/ccwYol (govde/iz)
+    // HICBIR ZAMAN kaldirilmaz/degistirilmez - %0'dan %100'e buyuyen bu IKI
+    // rect'in KENDISI, ilk mesajin KALICI dis derisi olarak kalir - sadece
+    // dasharray UZUNLUGU degisir, gercekten TEMAS NOKTASINDAN DISA DOGRU
+    // BUYUYEN bir geometri.
+    //
+    // Govde/iz'in KENDI stroke rengi (CSS'teki rgba(var(--yuzey-1/2), 0.55))
+    // SABIT kalir; element opacity'si TAZE_ORAN (~%35) boyunca 1'de kalip,
+    // sonra DINGINLESME_OPAKLIGI'na kadar yumusakca duser - akis
+    // TAMAMLANDIGINDA govde/iz CSS'teki 0.55 alfanin altina "sogur" ve
+    // .yaziyor-yuzey'in ince/kisitli gorunumune yaklasir. AYNI iki
+    // geometriden turetilen KISA, daha parlak "uc" segmentleri (cwUc/ccwUc)
+    // govdenin o anki HAREKETLI ucunu takip eder (DASHOFFSET SABIT/degisken
+    // formullerinden matematiksel olarak turetildi) - bunlar TAZE_ORAN
+    // boyunca gecici olarak daha genis (UC_PARLAMA_GENISLIK) cizilip normal
+    // genisligine (UC_NORMAL_GENISLIK) daralir, akis tamamlanmadan hemen
+    // once SONER (opacity 1->0, son %15) - bu, IKI GORUNUR, HAREKETLI parlak
+    // uc noktasi olarak balonun cevresinde CW/CCW dolanir. tamamlaninca geri
+    // cagirisi (SADECE rastgele tutam zamanlayicisini baslatir) akis SURESI
+    // dolunca calisir; SVG'ye/DOM'a BASKA HICBIR SEKILDE dokunulmaz.
+    function cevreAkisiCalistir(akis, sure, tamamlaninca) {
+        sure = sure || 750; // 650-850ms araliginda
+
+        // TAZE_ORAN: akisin ilk ~%35'i - hem govde/iz'in "taze" (opacity 1)
+        // kaldigi, hem "uc"un gecici olarak genisledigi pencere.
+        var TAZE_ORAN = 0.35;
+        // DINGINLESME_OPAKLIGI: TAZE_ORAN'dan sonra govde/iz'in element
+        // opacity'sinin sondugu carpan - CSS'teki 0.55 alfa ile carpilinca
+        // nihai/dinlenme gorunumu .yaziyor-yuzey'in kisitli yogunluguna
+        // yaklasir.
+        var DINGINLESME_OPAKLIGI = 0.55;
+
+        if (!akis.uzunluk || !akis.cwYol.animate) {
+            // WAAPI/getTotalLength desteklenmiyorsa: govde/iz'i dogrudan
+            // %100 dolu STATIK duruma getir (CSS ile) - boylece "kalici deri"
+            // hala doğru gorunur, sadece animasyonsuz belirir.
+            if (akis.uzunluk) {
+                var Lf = akis.uzunluk, s0f = akis.s0;
+                akis.cwYol.style.strokeDasharray = (Lf / 2) + "px " + (Lf / 2) + "px";
+                akis.cwYol.style.strokeDashoffset = (-s0f) + "px";
+                akis.cwYol.style.opacity = DINGINLESME_OPAKLIGI;
+                akis.ccwYol.style.strokeDasharray = (Lf / 2) + "px " + (Lf / 2) + "px";
+                akis.ccwYol.style.strokeDashoffset = (Lf / 2 - s0f) + "px";
+                akis.ccwYol.style.opacity = DINGINLESME_OPAKLIGI;
+            }
+            if (tamamlaninca) {
+                tamamlaninca();
+            }
+            return;
+        }
+
+        var L = akis.uzunluk, s0 = akis.s0;
+
+        // "Uc" segment uzunlugu: cevrenin ~%6'si, 6-...px arasinda sikistirilmis -
+        // kisa/tanidik bir "baslik", asla bir nokta/parcacik gibi gorunmeyecek
+        // kadar uzun degil.
+        var ucUzunlugu = Math.max(6, Math.min(L / 6, L * 0.06));
+        var UC_PARLAMA_GENISLIK = 6.5; // TAZE_ORAN boyunca gecici "canlanma" genisligi
+        var UC_NORMAL_GENISLIK = 4.5;  // CSS'teki .yaziyor-akis-uc stroke-width ile AYNI
+
+        akis.cwYol.animate(
+            [
+                { strokeDasharray: "0px " + L + "px", strokeDashoffset: (-s0) + "px", opacity: 1, offset: 0 },
+                { strokeDasharray: (TAZE_ORAN * L / 2) + "px " + (L - TAZE_ORAN * L / 2) + "px", strokeDashoffset: (-s0) + "px", opacity: 1, offset: TAZE_ORAN },
+                { strokeDasharray: (L / 2) + "px " + (L / 2) + "px", strokeDashoffset: (-s0) + "px", opacity: DINGINLESME_OPAKLIGI, offset: 1 }
+            ],
+            { duration: sure, easing: "ease-out", fill: "forwards" }
+        );
+
+        akis.ccwYol.animate(
+            [
+                { strokeDasharray: "0px " + L + "px", strokeDashoffset: (-s0) + "px", opacity: 1, offset: 0 },
+                { strokeDasharray: (TAZE_ORAN * L / 2) + "px " + (L - TAZE_ORAN * L / 2) + "px", strokeDashoffset: (-s0 + TAZE_ORAN * L / 2) + "px", opacity: 1, offset: TAZE_ORAN },
+                { strokeDasharray: (L / 2) + "px " + (L / 2) + "px", strokeDashoffset: (L / 2 - s0) + "px", opacity: DINGINLESME_OPAKLIGI, offset: 1 }
+            ],
+            { duration: sure, easing: "ease-out", fill: "forwards" }
+        );
+
+        // "Uc" katmanlari: dasharray SABIT (ucUzunlugu), dashoffset govde ile
+        // AYNI matematikten turetilir (senkron kalir). strokeWidth TAZE_ORAN
+        // boyunca UC_PARLAMA_GENISLIK'ten UC_NORMAL_GENISLIK'e daralir. Son
+        // %15'te opacity 1 -> 0 sonerek ucun kendisi de govdeyle AYNI anda
+        // "dinlenme" derisine karisir - bulusma noktasinda kalici parlak bir
+        // iz KALMAZ.
+        akis.cwUc.style.strokeDasharray = ucUzunlugu + "px " + (L - ucUzunlugu) + "px";
+        akis.cwUc.animate(
+            [
+                { strokeDashoffset: (ucUzunlugu - s0) + "px", strokeWidth: UC_PARLAMA_GENISLIK, opacity: 1, offset: 0 },
+                { strokeDashoffset: (ucUzunlugu - s0 - L / 2 * TAZE_ORAN) + "px", strokeWidth: UC_NORMAL_GENISLIK, opacity: 1, offset: TAZE_ORAN },
+                { strokeDashoffset: (ucUzunlugu - s0 - L / 2 * 0.85) + "px", strokeWidth: UC_NORMAL_GENISLIK, opacity: 1, offset: 0.85 },
+                { strokeDashoffset: (ucUzunlugu - s0 - L / 2) + "px", strokeWidth: UC_NORMAL_GENISLIK, opacity: 0, offset: 1 }
+            ],
+            { duration: sure, easing: "ease-out", fill: "forwards" }
+        );
+
+        akis.ccwUc.style.strokeDasharray = ucUzunlugu + "px " + (L - ucUzunlugu) + "px";
+        akis.ccwUc.animate(
+            [
+                { strokeDashoffset: (-s0) + "px", strokeWidth: UC_PARLAMA_GENISLIK, opacity: 1, offset: 0 },
+                { strokeDashoffset: (L / 2 * TAZE_ORAN - s0) + "px", strokeWidth: UC_NORMAL_GENISLIK, opacity: 1, offset: TAZE_ORAN },
+                { strokeDashoffset: (L / 2 * 0.85 - s0) + "px", strokeWidth: UC_NORMAL_GENISLIK, opacity: 1, offset: 0.85 },
+                { strokeDashoffset: (L / 2 - s0) + "px", strokeWidth: UC_NORMAL_GENISLIK, opacity: 0, offset: 1 }
+            ],
+            { duration: sure, easing: "ease-out", fill: "forwards" }
+        );
+
+        // Iki cephe (geometrik olarak KESIN) burada, s0 + uzunluk/2 noktasinda
+        // bulusmus olur. SVG'ye/govde-iz'e HICBIR SEKILDE dokunulmaz (fade
+        // YOK, kaldirma YOK, degistirme YOK) - sadece cagirana haber verilir
+        // (SADECE rastgele tutam zamanlayicisini baslatir, bkz. cagiran).
+        setTimeout(function () {
+            if (tamamlaninca) {
+                tamamlaninca();
+            }
+        }, sure);
+    }
+
+    // (Duzeltme) .yaziyor-parlak/.yaziyor-tutam'i (KENDI opacity/transform'u
+    // zaten parlakSuzulme/tutam olaylariyla surekli degistigi icin) crossfade
+    // edilebilecek ayri bir sarmalayicinin (.yaziyor-enerji) icine ekler. SADECE
+    // bu ikisi sarmalayici icindedir - .yaziyor-yuzey ARTIK BURAYA EKLENMEZ (bkz.
+    // balonuEtkinlestir'deki duzeltme notu). Balon basina yalnizca BIR kez
+    // eklenir (guvenlik agi). Cagiran, dondurulen elemanin crossfade'ini AYRICA
+    // (enerjiyiCrossfadeEt ile) baslatmalidir - boylece Asama 3 akisinin, hale'yi
+    // Şey'in seyahati SIRASINDA degil, temastan SONRA baslatmasina izin verilir.
+    function enerjiKatmaniniEkle(balon) {
+        var mevcut = balon.querySelector(".yaziyor-enerji");
+        if (mevcut) {
+            return mevcut;
+        }
+        balon.insertAdjacentHTML("afterbegin",
+            '<span class="yaziyor-enerji" aria-hidden="true">' +
+                '<span class="yaziyor-parlak"></span>' +
+                '<span class="yaziyor-tutam"></span>' +
+                '<span class="yaziyor-tutam"></span>' +
+                '<span class="yaziyor-tutam"></span>' +
+            '</span>');
+        return balon.querySelector(".yaziyor-enerji");
+    }
+
+    function enerjiyiCrossfadeEt(enerji, sure) {
+        if (!enerji) {
+            return;
+        }
+        var azaltilmisHareket = window.matchMedia &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (azaltilmisHareket) {
+            enerji.style.opacity = "1";
+        } else {
+            enerji.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                { duration: sure || 650, easing: "ease", fill: "forwards" }
+            );
+        }
+    }
+
+    // Yukleme balonunu Asama 1A/1C ile AYNI hale+tutam+yuzey sistemiyle
+    // etkinlestirir - sonraki mesajlarin kullandigi TAM AYNI CSS siniflari ve
+    // TAM AYNI JS fonksiyonu (yaziyorTutamlariBaslat) burada da kullanilir, ayri
+    // bir kopya YOK.
+    //
+    // (Duzeltme - kare/dortgen hale hatasi) .yaziyor-yuzey artik .yaziyor-enerji
+    // SARMALAYICISININ ICINE eklenmiyor. Nedeni: .yaziyor-yuzey'in
+    // "border-radius: inherit" kurali KENDI EBEVEYNININ hesaplanmis degerini
+    // alir. Sonraki mesajlarda .yaziyor-yuzey .yaziyor-balonu'nun DOGRUDAN
+    // cocugudur, bu yuzden 1.25rem'i dogru miras alir. Ama .yaziyor-enerji'nin
+    // KENDI border-radius'u YOK (bu ozellik miras alinmaz, baslangic degeri 0'dir)
+    // - .yaziyor-yuzey o sarmalayicinin icine konunca "inherit" 0 aliyordu, bu da
+    // kare/dortgen goruntuye yol aciyordu. Cozum: burada da .yaziyor-yuzey,
+    // sonraki-mesaj yapisiyla BIREBIR ayni sekilde .yaziyor-balonu'nun DOGRUDAN
+    // cocugu olarak eklenir (.yaziyor-enerji'nin DISINDA, kardes olarak).
+    // .yaziyor-yuzey'in KENDI gorsel degerleri (box-shadow vb.) DEGISMEDI.
+    //
+    // Griyi tasiyan .yaziyor-arkaplan katmani, balonun kendi seffaflasan arka
+    // planiyla AYNI senkron adimda degistigi icin (Asama 1'den beri kanitlanmis
+    // teknik) gorsel bir sicrama olmaz.
+    function balonuEtkinlestir(balon, satir) {
+        if (balon.querySelector(".yaziyor-arkaplan")) {
+            return; // zaten etkinlestirilmis (guvenlik agi ikinci kez tetiklenirse)
+        }
+
+        balon.classList.add("sonraki-hale");
+        if (satir) {
+            satir.classList.add("sonraki-hale");
+        }
+
+        var enerjiZatenVardi = !!balon.querySelector(".yaziyor-enerji");
+        var enerji = enerjiKatmaniniEkle(balon);
+        if (!enerjiZatenVardi) {
+            // Buraya sadece azaltilmis-hareket guvenlik yolundan (Şey seyahati
+            // hic calismadan) ulasildiysa girilir - normal Asama 3 akisinda
+            // enerji katmani ve carprazlamasi ZATEN temastan hemen sonra
+            // baslatilmis olur (bkz. parlamayiBalonaTasi -> temasAni).
+            enerjiyiCrossfadeEt(enerji, 650);
+        }
+
+        // .yaziyor-yuzey (kalici dis yuzey) DOGRUDAN balonun cocugu olarak
+        // eklenir - .yaziyor-enerji'nin DISINDA (yukaridaki duzeltme notuna bkz.).
+        balon.insertAdjacentHTML("afterbegin",
+            '<span class="yaziyor-yuzey" aria-hidden="true"></span>' +
+            '<span class="yaziyor-arkaplan" aria-hidden="true"></span>');
+
+        var tutamDurdur = yaziyorTutamlariBaslat(balon);
+        window.addEventListener("pagehide", tutamDurdur, { once: true });
+    }
+
+    // Asama 1C: sonraki mesaj yukleme balonu icin rastgele plazma tutam olaylari.
+    // Sabit @@keyframes YOK - her olay, uc yeniden-kullanilabilir #yaziyor-tutam
+    // elemanindan BOSTA olan birini secip Element.animate() ile TAMAMEN
+    // rastgelestirilmis bir kare dizisiyle canlandirir, sonra elemani havuza
+    // iade eder. Yeni bir requestAnimationFrame dongusu YOK - zamanlama, her
+    // olaydan sonra kendini yeniden kuran ozyineli bir setTimeout ile yapilir
+    // (canvas/#parlama motoru burada hic devrede degil).
+    function yaziyorTutamlariBaslat(balon) {
+        var tutamlar = balon.querySelectorAll(".yaziyor-tutam");
+        if (!tutamlar.length || !tutamlar[0].animate) {
+            return function () {};
+        }
+
+        var azaltilmisHareket = window.matchMedia &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (azaltilmisHareket) {
+            return function () {};
+        }
+
+        var havuz = Array.prototype.map.call(tutamlar, function (el) {
+            return { el: el, mesgul: false };
+        });
+
+        // Balonun cevresinde 6 organik bolge - her biri kendi "disa dogru" aci
+        // merkezine (0=sag, 90=asagi, 180=sol, 270/-90=yukari) ve balonun kendi
+        // kutusuna gore yaklasik bir baslangic konumuna (%) sahip. Tam dortluk
+        // (yalnizca yukarı/sag/asagi/sol) kasitli olarak KULLANILMADI.
+        var BOLGELER = [
+            { ad: "sag-ust", aci: -50, sol: [68, 90], ust: [-6, 20] },
+            { ad: "sag", aci: 0, sol: [90, 104], ust: [30, 68] },
+            { ad: "sag-alt", aci: 55, sol: [68, 90], ust: [76, 102] },
+            { ad: "sol-alt", aci: 125, sol: [8, 30], ust: [76, 102] },
+            { ad: "sol", aci: 180, sol: [-6, 8], ust: [30, 68] },
+            { ad: "sol-ust", aci: 235, sol: [8, 30], ust: [-6, 20] }
+        ];
+
+        var sonBolgeAdi = null;
+        var zamanlayiciId = null;
+        var durduruldu = false;
+
+        function rastgele(min, max) {
+            return min + Math.random() * (max - min);
+        }
+
+        function bolgeSec() {
+            var adaylar = BOLGELER.filter(function (b) { return b.ad !== sonBolgeAdi; });
+            var havuzSecim = adaylar.length ? adaylar : BOLGELER;
+            return havuzSecim[Math.floor(Math.random() * havuzSecim.length)];
+        }
+
+        function bosSlotBul() {
+            for (var i = 0; i < havuz.length; i++) {
+                if (!havuz[i].mesgul) {
+                    return havuz[i];
+                }
+            }
+            return null;
+        }
+
+        // Tek bir rastgele tutam olayi: konum/boyut/gradyan JS'ten dogrudan
+        // stil olarak yazilir (statik), yalnizca transform/opacity Element.animate()
+        // ile canlandirilir. Kok (baslangic konumu + gradyanin guclu ucu) SABIT
+        // kalir; sadece disa tasan UC buyuyup/kucularak "uzanma" hissi verir -
+        // boylece hicbir zaman balondan kopup giden bir parcacik gibi gorunmez.
+        function birOlayCalistir() {
+            var slot = bosSlotBul();
+            if (!slot) {
+                return; // uc tutam da mesgul - bu turu atla, sonraki zamanlanmis denemeye birak
+            }
+
+            var bolge = bolgeSec();
+            sonBolgeAdi = bolge.ad;
+
+            var el = slot.el;
+            var stil = getComputedStyle(el);
+            var renk1 = stil.getPropertyValue("--tutam-1").trim();
+            var renk2 = stil.getPropertyValue("--tutam-2").trim();
+
+            var solYuzde = rastgele(bolge.sol[0], bolge.sol[1]);
+            var ustYuzde = rastgele(bolge.ust[0], bolge.ust[1]);
+            var aciSon = (bolge.aci + rastgele(-18, 18)) * Math.PI / 180;
+            var aciOrta = (bolge.aci + rastgele(-30, 30)) * Math.PI / 180;
+
+            var uzunluk = rastgele(8, 22);
+            var ortaUzunluk = uzunluk * rastgele(0.55, 0.72);
+
+            var dxSon = Math.cos(aciSon) * uzunluk;
+            var dySon = Math.sin(aciSon) * uzunluk;
+            var dxOrta = Math.cos(aciOrta) * ortaUzunluk;
+            var dyOrta = Math.sin(aciOrta) * ortaUzunluk;
+
+            var kokX = rastgele(10, 24);
+            var kokY = 50 + rastgele(-12, 12);
+            var karisim = rastgele(26, 46);
+            var sonum = rastgele(64, 78);
+
+            el.style.left = solYuzde + "%";
+            el.style.top = ustYuzde + "%";
+            el.style.width = rastgele(16, 32) + "px";
+            el.style.height = rastgele(8, 18) + "px";
+            el.style.transformOrigin = kokX + "% " + kokY + "%";
+            el.style.background =
+                "radial-gradient(ellipse at " + kokX + "% " + kokY + "%, " +
+                renk1 + " 0%, " + renk2 + " " + karisim + "%, transparent " + sonum + "%)";
+
+            var donusOrta = rastgele(-16, 16);
+            var donusSon = donusOrta + rastgele(-10, 10);
+            var tepeOpaklik = rastgele(0.3, 0.62);
+
+            var kareler = [
+                { transform: "translate(0px, 0px) rotate(0deg) scale(0.5, 0.6)", opacity: 0 },
+                {
+                    transform: "translate(" + (dxOrta * 0.5) + "px, " + (dyOrta * 0.5) + "px) rotate(" +
+                        (donusOrta * 0.4) + "deg) scale(" + rastgele(0.85, 1.05) + ", " + rastgele(0.55, 0.75) + ")",
+                    opacity: tepeOpaklik * 0.7,
+                    offset: 0.3
+                },
+                {
+                    transform: "translate(" + dxOrta + "px, " + dyOrta + "px) rotate(" + donusOrta +
+                        "deg) scale(" + rastgele(1.05, 1.3) + ", " + rastgele(0.5, 0.68) + ")",
+                    opacity: tepeOpaklik,
+                    offset: 0.55
+                },
+                {
+                    transform: "translate(" + dxSon + "px, " + dySon + "px) rotate(" + donusSon +
+                        "deg) scale(" + rastgele(0.55, 0.75) + ", " + rastgele(0.4, 0.55) + ")",
+                    opacity: 0
+                }
+            ];
+
+            slot.mesgul = true;
+            var animasyon = el.animate(kareler, {
+                duration: rastgele(700, 1600),
+                easing: "ease-in-out",
+                fill: "none"
+            });
+
+            function serbestBirak() {
+                slot.mesgul = false;
+                el.style.opacity = "0";
+            }
+            animasyon.onfinish = serbestBirak;
+            animasyon.oncancel = serbestBirak;
+        }
+
+        function sonrakiZamanlayiciyiKur() {
+            if (durduruldu) {
                 return;
             }
-            tamamlandi = true;
-            parlama.removeEventListener("transitionend", transitionBitince);
-            clearTimeout(yedekZamanlayici);
-
-            hedefBalon.appendChild(parlama);
-            parlama.style.position = "";
-            parlama.style.top = "";
-            parlama.style.left = "";
-            parlama.style.transition = "";
-            parlama.classList.add("parlama-balonda");
+            zamanlayiciId = setTimeout(function () {
+                birOlayCalistir();
+                sonrakiZamanlayiciyiKur();
+            }, rastgele(350, 1800));
         }
 
-        function transitionBitince(e) {
-            if (e.target === parlama && (e.propertyName === "top" || e.propertyName === "left")) {
-                geziyiBitir();
+        sonrakiZamanlayiciyiKur();
+
+        return function durdur() {
+            durduruldu = true;
+            if (zamanlayiciId) {
+                clearTimeout(zamanlayiciId);
             }
-        }
-
-        parlama.addEventListener("transitionend", transitionBitince);
-        yedekZamanlayici = setTimeout(geziyiBitir, sure + 150);
+        };
     }
 
     document.getElementById("soru-formu").addEventListener("submit", function () {
@@ -1050,23 +1989,51 @@
         }, 0);
 
         var yaziyorSatiri = document.createElement("div");
-        yaziyorSatiri.className = "d-flex justify-content-start mb-3 yaziyor-satiri mesaj-satiri";
-        yaziyorSatiri.innerHTML =
-            '<div class="alert mb-0 chat-balon balon-cevap yaziyor-balonu" style="max-width:70%;">' +
-            '<span class="nokta">.</span><span class="nokta">.</span><span class="nokta">.</span>' +
-            '</div>';
+        // "sonraki-hale" satira da eklenir: #mesajKutusu (overflow-y:auto) her
+        // sonraki-mesaj gonderiminde scroll-to-bottom yapildigi icin bu satirin
+        // ALTINDA hemen hemen hic bosluk kalmiyor - hale disariya tastiginda
+        // #mesajKutusu'nun kirpma sinirina carpip duz bir cizgide kesiliyordu.
+        // Bu satira ozel (yalnizca .sonraki-hale) fazladan padding-bottom, hale
+        // tamamen sonmeden o sinira ulasmasini engeller (bkz. asagidaki CSS).
+        yaziyorSatiri.className = "d-flex justify-content-start mb-3 yaziyor-satiri mesaj-satiri" +
+            (ilkMesajMi ? "" : " sonraki-hale");
+        // Ilk mesaj: balon TAMAMEN ORIJINAL/degismemis - #parlama FLIP ile buraya
+        // gezinecek (bkz. asagi), asama 2'ye kadar boyle kalacak. Sonraki mesajlar:
+        // balon ayni gorunumu korur (ayni .chat-balon/.balon-cevap/max-width:70%),
+        // ama ekstra dekoratif katmanlar icerir: .yaziyor-parlak (Asama 1A temel
+        // hale), uc ozdes .yaziyor-tutam (Asama 1C: sabit siniflar/keyframes YOK -
+        // hepsi JS tarafindan yaziyorTutamlariBaslat ile rastgele canlandirilan,
+        // yeniden kullanilabilir bir havuz), .yaziyor-yuzey (tamamlanmis, ince dis
+        // enerji yuzeyi - balonun silueti boyunca box-shadow ile, tutamlardan
+        // SONRA/uzerinde durur ki aktif bir tutam bu yuzeyden cikiyormus gibi
+        // gorunsun) ve .yaziyor-arkaplan (griyi tasiyan katman, hepsinin ustunde,
+        // noktalarin altinda) - #parlama'ya hic dokunulmaz.
+        yaziyorSatiri.innerHTML = ilkMesajMi
+            ? '<div class="alert mb-0 chat-balon balon-cevap yaziyor-balonu" style="max-width:70%;">' +
+              '<span class="nokta">.</span><span class="nokta">.</span><span class="nokta">.</span>' +
+              '</div>'
+            : '<div class="alert mb-0 chat-balon balon-cevap yaziyor-balonu sonraki-hale" style="max-width:70%;">' +
+              '<span class="yaziyor-parlak" aria-hidden="true"></span>' +
+              '<span class="yaziyor-tutam" aria-hidden="true"></span>' +
+              '<span class="yaziyor-tutam" aria-hidden="true"></span>' +
+              '<span class="yaziyor-tutam" aria-hidden="true"></span>' +
+              '<span class="yaziyor-yuzey" aria-hidden="true"></span>' +
+              '<span class="yaziyor-arkaplan" aria-hidden="true"></span>' +
+              '<span class="nokta">.</span><span class="nokta">.</span><span class="nokta">.</span>' +
+              '</div>';
         kutu.appendChild(yaziyorSatiri);
 
-        var parlama = document.getElementById("parlama");
-        var yaziyorBalonu = yaziyorSatiri.querySelector(".chat-balon");
-
-        if (parlama && yaziyorBalonu) {
-            if (ilkMesajMi) {
-                parlamayiBalonaTasi(parlama, yaziyorBalonu);
-            } else {
-                yaziyorBalonu.appendChild(parlama);
-                parlama.classList.remove("parlama-gizli");
-                parlama.classList.add("parlama-balonda");
+        if (ilkMesajMi) {
+            var parlama = document.getElementById("parlama");
+            var yaziyorBalonu = yaziyorSatiri.querySelector(".chat-balon");
+            if (parlama && yaziyorBalonu) {
+                parlamayiBalonaTasi(parlama, yaziyorBalonu, yaziyorSatiri);
+            }
+        } else {
+            var sonrakiBalon = yaziyorSatiri.querySelector(".chat-balon");
+            if (sonrakiBalon) {
+                var tutamDurdur = yaziyorTutamlariBaslat(sonrakiBalon);
+                window.addEventListener("pagehide", tutamDurdur, { once: true });
             }
         }
 
