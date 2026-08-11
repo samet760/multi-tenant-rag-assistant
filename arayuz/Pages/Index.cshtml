@@ -679,6 +679,15 @@
         var sonKareZamani = 0;
         var sonAlanZamani = 0;
 
+        // sonBilinenManyetikGuc: SADECE alanDegerlendir'in cekirdek-lobu
+        // hesabinda kullanilan, YUMUSATILMIS bir manyetikGuc() OKUMASI - bkz.
+        // asagida alanDegerlendir. manyetikGuc/manyetik.aktif/__parlamaManyetikBaslat/
+        // Bitir'in KENDISI DEGISTIRILMEDI; bu SADECE temas aninda guc()'un
+        // 1'den 0'a ANINDA dusmesi (Bitir cagrilinca) durumunda alanin bir
+        // render karesinde "duz yuvarlaga" SICRAMASINI onlemek icin eklenen,
+        // ayri bir yardimci degisken.
+        var sonBilinenManyetikGuc = 0;
+
         // MANYETIK CEKIM (SADECE ilk mesaj Şey-seyahati sirasinda aktif -
         // bkz. asagidaki window.__parlamaManyetikBaslat/manyetikKuvvetiUygula).
         // Varsayilan durumda "aktif:false" - idle govde ve sonraki mesajlar
@@ -876,15 +885,31 @@
         // 3b) Her parcacik icin hafif bir merkeze meyil (cekirdek icin cok daha guclu -
         // bu, cekirdegin sabit kalmasini saglayan asil mekanizmadir) ve sinirin otesinde
         // giderek guclenen, sert olmayan bir geri cagirma (duvar sekmesi degil).
-        function merkezVeSinirKuvvetiUygula() {
+        //
+        // MANYETIK CEKIRDEK ESNEKLIGI (tani sonrasi eklendi): cekirdegin
+        // normal sertligi (34) manyetikGuc(zamanMs) SIFIRKEN (idle, onset-
+        // oncesi, temas SONRASI - __parlamaManyetikBitir cagrildiktan
+        // sonra - ve sonraki mesajlar; guc() bu durumlarin HEPSINDE 0
+        // doner) DEGISMEDEN kalir. SADECE ilk mesaj manyetik cekimi aktifken,
+        // guc 0->1 yukseldikce cekirdegin merkeze-donus sertligi 34'ten ~10'a
+        // dogru SICRAMASIZ azalir - tani, AYNI manyetik kuvvetin (bkz.
+        // manyetikKuvvetiUygula, DEGISTIRILMEDI) k=34 karsisinda cekirdegi
+        // sadece ~4.4px kaydirdigini, bunun govdenin en baskin/en genis
+        // parcacigi oldugu icin siluetin gozle gorulur sekilde degismesine
+        // yetmedigini gostermisti. Tandril sertligi (0.9), yay sertligi,
+        // yirtilma esikleri VE manyetik kuvvet buyuklukleri/yonu HICBIR
+        // SEKILDE degistirilmedi - burada SADECE cekirdegin BU fonksiyondaki
+        // KENDI direnc sabiti manyetikGuc()'a bagli hale getirildi.
+        function merkezVeSinirKuvvetiUygula(zamanMs) {
             var merkezX = alanW / 2, merkezY = alanH / 2;
             var sinirYaricap = alanW * 0.48;
+            var cekirdekSertligi = 34 - (34 - 10) * manyetikGuc(zamanMs);
 
             for (var i = 0; i < tumParcaciklar.length; i++) {
                 var p = tumParcaciklar[i];
                 var dx = merkezX - p.x, dy = merkezY - p.y;
                 var mesafe = Math.sqrt(dx * dx + dy * dy);
-                var k = p.tur === "cekirdek" ? 34 : 0.9;
+                var k = p.tur === "cekirdek" ? cekirdekSertligi : 0.9;
 
                 p.fx += dx * k;
                 p.fy += dy * k;
@@ -998,6 +1023,43 @@
             }
             var ilerleme = (t - MANYETIK_BASLANGIC_ORANI) / (1 - MANYETIK_BASLANGIC_ORANI);
             return ilerleme * ilerleme * (3 - 2 * ilerleme);
+        }
+
+        // MANYETIK_GORSEL_BASLANGIC_ORANI/MANYETIK_GORSEL_TAM_ORANI: SADECE
+        // manyetikGorselGuc() (asagida) tarafindan kullanilir - manyetikGuc()'un
+        // KENDI MANYETIK_BASLANGIC_ORANI'sini (partikul kuvvetleri/cekirdek
+        // sertligi icin, DEGISMEDI) ETKILEMEZ.
+        var MANYETIK_GORSEL_BASLANGIC_ORANI = 0.30;
+        var MANYETIK_GORSEL_TAM_ORANI = 0.68;
+
+        // manyetikGorselGuc(zamanMs): manyetikGuc() ile AYNI paylasilan
+        // durumu (manyetik.aktif/baslangicZamani/sure) okur - YENI bir
+        // zamanlayici/durum EKLENMEDI - ama SADECE gorsel skaler-alan lob
+        // deformasyonu (bkz. alanDegerlendir) icin FARKLI, DAHA ERKEN
+        // baslayan ve daha erken tam guce ulasip ORADA KALAN bir egri
+        // uretir: t<=0.30 (seyahatin ilk ~%30'u) 0, 0.30-0.68 arasi
+        // smoothstep ile SICRAMASIZ 0->1, t>=0.68'den (yani gercek temastan,
+        // t=1'den, ONCE) itibaren KALICI olarak 1 - govde temasa kadar
+        // acikca deforme GORUNMEYE devam eder, tek kare/son-anlik bir etki
+        // olmaz. Partikul kuvvetlerinin (manyetikKuvvetiUygula), cekirdek
+        // sertliginin (merkezVeSinirKuvvetiUygula) VE tandril kuvvetlerinin
+        // kullandigi manyetikGuc()/MANYETIK_BASLANGIC_ORANI'ye HICBIR SEKILDE
+        // dokunulmadi - bu fonksiyonlar hala AYNI (0.52'de baslayan, t=1'e
+        // kadar yukselen) egriyi kullanir; sadece GORUNEN lob geometrisi
+        // daha erken/daha uzun sure tam guce sahip.
+        function manyetikGorselGuc(zamanMs) {
+            if (!manyetik.aktif) {
+                return 0;
+            }
+            var t = (zamanMs - manyetik.baslangicZamani) / manyetik.sure;
+            if (t <= MANYETIK_GORSEL_BASLANGIC_ORANI) {
+                return 0;
+            }
+            if (t >= MANYETIK_GORSEL_TAM_ORANI) {
+                return 1;
+            }
+            var ilerlemeGorsel = (t - MANYETIK_GORSEL_BASLANGIC_ORANI) / (MANYETIK_GORSEL_TAM_ORANI - MANYETIK_GORSEL_BASLANGIC_ORANI);
+            return ilerlemeGorsel * ilerlemeGorsel * (3 - 2 * ilerlemeGorsel);
         }
 
         // 3e-bis) Manyetik cekim kuvveti: guc<=0 iken TAMAMEN no-op (idle/
@@ -1183,7 +1245,7 @@
             }
 
             yayKuvvetleriUygula();
-            merkezVeSinirKuvvetiUygula();
+            merkezVeSinirKuvvetiUygula(zamanMs);
             vortexKuvvetiUygula(zamanMs);
             manyetikKuvvetiUygula(zamanMs);
 
@@ -1216,9 +1278,83 @@
         // etrafinda yumusatilmis bir alfaya cevirir ve kucuk tuvale yazar. Bu fonksiyon
         // parcaciklarin nereden geldigini (cekirdek/tandril/serbest) bilmez - sadece
         // duz bir x/y/r listesi okur, bu yuzden yeni hareket modeliyle degismeden calisir.
-        function alanDegerlendir() {
+        //
+        // MANYETIK CEKIRDEK ALAN DAGILIMI (ilk mesaj manyetik cekimi icin -
+        // tani, cekirdegin FIZIKSEL kaydirilmasinin (bkz. merkezVeSinirKuvvetiUygula'daki
+        // manyetik esneklik) TEK BASINA siluette yeterince buyuk/okunakli bir
+        // degisim yaratamayacagini gosterdi; cekirdek govdenin en baskin alan
+        // katkicisidir - onu fiziksel olarak degil, SADECE bu render adiminda,
+        // alan hesabinda birden fazla ortusukmerkez olarak temsil etmek daha
+        // dogrudan bir kontrol noktasi). manyetikCekirdekGucu<=0 iken (idle,
+        // onset-oncesi, temas SONRASI, sonraki mesajlar - manyetikGorselGuc()
+        // bu durumlarin HEPSINDE 0 doner) cekirdekLoblari HICBIR ZAMAN kurulmaz
+        // ve asagidaki parcacik dongusu cekirdek icin AYNI TEK r²/(d²+1)
+        // terimini uretir - bugunku render BIREBIR AYNI kalir. guc>0 iken
+        // (SADECE ilk mesaj seyahatinin son diliminde), cekirdegin katkisi
+        // GERCEK konumu (cekirdek.x/y) etrafinda, birbirini GUCLU orten dort
+        // "sanal merkeze" (ana + on lob + iki yan/omuz lobu) dagitilir -
+        // hicbiri gercek parcacik DEGILDIR (tumParcaciklar'a eklenmez, hiz/
+        // yay/yirtilma'ya sahip degildir, SADECE bu tek kare hesabinda
+        // yasayan gecici skaler-alan katkilaridir). Agirliklar (0.52+0.28+
+        // 0.10*yan1+0.10*yan2) orijinal r²'ye YAKIN toplam kalacak sekilde
+        // secildi (asiri buyume degil, YENIDEN DAGITIM). Yon manyetik.yonX/Y
+        // (DEGISTIRILMEDI, zaten doğrulanmis), asimetri cekirdek.manyetikYan
+        // (parcacikOlustur'de BIR KEZ atanan, PARCACIK OMRU boyunca SABIT
+        // deger) uzerinden turetilir - boylece "asimetri icin sabit bir
+        // tohum" gereksinimi, YENI bir rastgele durum EKLEMEDEN, ONCEDEN VAR
+        // OLAN bu alan yeniden kullanilarak karsilanir; kare-basina rastgelelik
+        // YOK, bu yuzden titreme olmaz. Kullanilan guc degeri
+        // manyetikGuc()'un HAM sonucu DEGIL - GORSEL egri manyetikGorselGuc()
+        // (yukarida, DAHA ERKEN baslayip DAHA ERKEN tam guce ulasan ayri bir
+        // zamanlama) uzerinden okunur, sonra sonBilinenManyetikGuc (bkz.
+        // yukarida) ile hafifce yumusatilir - bu, SADECE temas aninda
+        // (__parlamaManyetikBitir cagrilip guc() aninda 0'a dusunce) lobların
+        // bir render karesinde duz yuvarlaga SICRAMASINI onler. Partikul
+        // kuvvetlerinin kullandigi manyetikGuc()'un KENDISI/zamanlamasi
+        // degismedi - SADECE bu render fonksiyonunun okudugu ilerleme egrisi
+        // degisti.
+        function alanDegerlendir(zamanMs) {
             var veri = alanVerisi.data;
             var idx = 0;
+
+            var manyetikHedefGuc = manyetikGorselGuc(zamanMs || performance.now());
+            sonBilinenManyetikGuc += (manyetikHedefGuc - sonBilinenManyetikGuc) * 0.35;
+            if (sonBilinenManyetikGuc < 0.002) {
+                sonBilinenManyetikGuc = 0;
+            }
+            var manyetikCekirdekGucu = sonBilinenManyetikGuc;
+            var cekirdekLoblari = null;
+            if (manyetikCekirdekGucu > 0 && cekirdek) {
+                var dikX = -manyetik.yonY, dikY = manyetik.yonX;
+                var yan1Katsayi = 0.85 + cekirdek.manyetikYan * 0.35;
+                var yan2Katsayi = 0.85 - cekirdek.manyetikYan * 0.35;
+                var r2 = cekirdek.r * cekirdek.r;
+                // Kaymalar (SADECE bu ucu, agirlik/yaricap/formul DEGISMEDI):
+                // ONCEKI degerler (0.95/0.55/0.35 * cekirdek.r) lob
+                // merkezlerini birbirine COK yakin birakiyordu - ortusen
+                // katkilar esikleme sonrasi neredeyse TEK bir yuvarlak alana
+                // geri "eriyordu" (goze carpan bir siluet degisimi
+                // OLMUYORDU). Kasitli olarak KARARLI sekilde ~2 kat
+                // artirildi - on lob artik cekirdek yaricapinin NEREDEYSE
+                // IKI KATI kadar disari cikabiliyor, omuz loblari da hem
+                // dikine hem ileri yonde belirgin sekilde daha uzakta -
+                // esikleme sonrasi govde artik acikca yonlu/asimetrik
+                // gerilmis okunuyor, ama agirliklar (0.52/0.28/0.10*yan1/
+                // 0.10*yan2) hala GUCLU bir ortusme saglayacak kadar
+                // buyuk oldugundan (bkz. yukarida, DEGISMEDI) tum loblar
+                // TEK bir baglantili kutle olarak esiklenmeye devam eder -
+                // ayrik daireler OLUSMAZ.
+                var onKaymasi = cekirdek.r * 1.85 * manyetikCekirdekGucu;
+                var yanKaymasi = cekirdek.r * 1.10 * manyetikCekirdekGucu;
+                var yanOnPay = cekirdek.r * 0.70 * manyetikCekirdekGucu;
+
+                cekirdekLoblari = [
+                    { x: cekirdek.x, y: cekirdek.y, r2: r2 * 0.52 },
+                    { x: cekirdek.x + manyetik.yonX * onKaymasi, y: cekirdek.y + manyetik.yonY * onKaymasi, r2: r2 * 0.28 },
+                    { x: cekirdek.x + manyetik.yonX * yanOnPay + dikX * yanKaymasi, y: cekirdek.y + manyetik.yonY * yanOnPay + dikY * yanKaymasi, r2: r2 * 0.10 * yan1Katsayi },
+                    { x: cekirdek.x + manyetik.yonX * yanOnPay - dikX * yanKaymasi, y: cekirdek.y + manyetik.yonY * yanOnPay - dikY * yanKaymasi, r2: r2 * 0.10 * yan2Katsayi }
+                ];
+            }
 
             for (var gy = 0; gy < GRID_H; gy++) {
                 var py = (gy + 0.5) / GRID_H * alanH;
@@ -1228,6 +1364,16 @@
 
                     for (var n = 0; n < tumParcaciklar.length; n++) {
                         var nuk = tumParcaciklar[n];
+
+                        if (nuk === cekirdek && cekirdekLoblari) {
+                            for (var lb = 0; lb < cekirdekLoblari.length; lb++) {
+                                var lob = cekirdekLoblari[lb];
+                                var ldx = px - lob.x, ldy = py - lob.y;
+                                toplam += lob.r2 / (ldx * ldx + ldy * ldy + 1);
+                            }
+                            continue;
+                        }
+
                         var dx = px - nuk.x;
                         var dy = py - nuk.y;
                         toplam += (nuk.r * nuk.r) / (dx * dx + dy * dy + 1);
@@ -1413,7 +1559,7 @@
 
             if (zamanMs - sonAlanZamani >= ALAN_HEDEF_ARALIGI) {
                 sonAlanZamani = zamanMs;
-                alanDegerlendir();
+                alanDegerlendir(zamanMs);
                 sivyiCiz(zamanMs);
             }
 
@@ -1429,7 +1575,7 @@
         if (azaltilmisHareket) {
             // Tek, statik bir kare: surekli simulasyon calistirilmaz.
             fizigiGuncelle(performance.now(), 0);
-            alanDegerlendir();
+            alanDegerlendir(performance.now());
             sivyiCiz(performance.now());
         } else {
             requestAnimationFrame(dongu);
