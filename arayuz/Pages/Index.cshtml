@@ -346,10 +346,23 @@
        hareketli ucun (alfa 1) yaninda "neredeyse ayni parlaklikta"
        okunabilsin diye. .yaziyor-yuzey (sonraki mesajlarin kullandigi ayni
        degiskenler) ve .yaziyor-akis-uc-cw/ccw'nin KENDI alfa/filter'i
-       ETKILENMEDI. */
+       ETKILENMEDI.
+
+       RENK BIRLIGI: cw KENDI --yuzey-1, ccw KENDI --yuzey-2'yi
+       kullaniyordu - iki degisken de FARKLI TONLAR (ac. temada acik
+       sari/turuncu, koyu temada acik leylak/koyu mor). Sonuc: cevre
+       tamamlaninca iki yarim, TEK bir enerji kablosu yerine iki AYRI
+       renkte parca gibi okunuyordu. Artik cw da ccw ile AYNI --yuzey-2
+       kaynagini kullaniyor (--yuzey-1/2'nin KENDI tanimlari, .yaziyor-yuzey
+       gibi baska yerlerde kullanildigi icin DEGISTIRILMEDI - sadece BU
+       kuralin hangi degiskene baktigi degisti). --yuzey-2, her iki temada
+       da uygulamanin mevcut vurgu rengiyle (acik temada #sor-dugmesi'nin
+       ikinci durak rengi #f97316, koyu temada hem #sor-dugmesi'nin ikinci
+       durak rengi hem #parlama'nin ucuncu durak rengi #7c3aed) BIREBIR
+       AYNI oldugu icin secildi - yeni bir renk ICAT EDILMEDI. */
     .yaziyor-akis-cw {
-        stroke: rgba(var(--yuzey-1), 0.92);
-        filter: drop-shadow(0 0 1.4px rgba(var(--yuzey-1), 0.5));
+        stroke: rgba(var(--yuzey-2), 0.92);
+        filter: drop-shadow(0 0 1.4px rgba(var(--yuzey-2), 0.5));
     }
 
     .yaziyor-akis-ccw {
@@ -365,8 +378,12 @@
         filter: blur(1px);
     }
 
+    /* Ucun rengi de govde/iz ile AYNI birlik icin --yuzey-2'ye hizalandi
+       (bkz. yukaridaki RENK BIRLIGI notu) - alfa (1), blur(1px) ve
+       tamamlanma soneme davranisi (bkz. JS cevreAkisiCalistir) HICBIR
+       SEKILDE DEGISMEDI. */
     .yaziyor-akis-uc-cw {
-        stroke: rgba(var(--yuzey-1), 1);
+        stroke: rgba(var(--yuzey-2), 1);
     }
 
     .yaziyor-akis-uc-ccw {
@@ -1645,8 +1662,18 @@
         var w = dikdortgen.width, h = dikdortgen.height;
         var r = parseFloat(getComputedStyle(balon).borderTopLeftRadius) || 0;
         r = Math.max(0, Math.min(r, w / 2 - 1, h / 2 - 1));
-        var gecOznitelik = 'x="1.5" y="1.5" width="' + Math.max(0, w - 3) +
-            '" height="' + Math.max(0, h - 3) + '" rx="' + r + '" ry="' + r + '"';
+        // KENAR_ICE_PAY: yol/uc dortgeninin SVG kutusunun kendi kenarindan
+        // ne kadar ice cekildigi - ONCEDEN 1.5px idi, bu balonun GERCEK dis
+        // sinirinin biraz ICINDE, ince acik/beyaz bir bosluk birakiyordu
+        // (govde artik blur() ile bulaniklastirilmadigindan - bkz. yukarida
+        // CEKIRDEK/HALE notu - bu bosluk daha belirgin gorunuyordu). Deger
+        // 0.75'e indirilerek yol/uc SADECE disariya dogru KUCUK bir miktar
+        // kaydirildi - r/getPointAtLength/s0/dasharray formulleri DEGISMEDI,
+        // sadece BU rect'in kendi konumu/boyutu (dolayisiyla akisin calisma-
+        // zamaninda olctugu uzunluk) hafifce degisti.
+        var KENAR_ICE_PAY = 0.75;
+        var gecOznitelik = 'x="' + KENAR_ICE_PAY + '" y="' + KENAR_ICE_PAY + '" width="' + Math.max(0, w - KENAR_ICE_PAY * 2) +
+            '" height="' + Math.max(0, h - KENAR_ICE_PAY * 2) + '" rx="' + r + '" ry="' + r + '"';
 
         balon.insertAdjacentHTML("afterbegin",
             '<svg class="yaziyor-akis" aria-hidden="true" width="' + w + '" height="' + h +
