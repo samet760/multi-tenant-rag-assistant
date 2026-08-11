@@ -360,14 +360,30 @@
        ikinci durak rengi #f97316, koyu temada hem #sor-dugmesi'nin ikinci
        durak rengi hem #parlama'nin ucuncu durak rengi #7c3aed) BIREBIR
        AYNI oldugu icin secildi - yeni bir renk ICAT EDILMEDI. */
+    /* DIS HALE: mevcut ilk drop-shadow (1.4px/0.5 - CEKIRDEGE SIKICA
+       yapisik, konumu/boyutu DEGISMEDI) korunarak, ikinci, daha genis/
+       yumusak bir drop-shadow katmani EKLENDI. Yaricap 3px -> 5.5px
+       (DEGISMEDI) ve alfa 0.4 -> 0.5 -> 0.75 yukseltildi: yaricapi
+       buyutmek (blur/gaussian yayilma) tek basina yeterli GORUNURLUK
+       artisi saglamiyordu (sabit "alfa kutlesi" daha genis alana
+       yayilinca tepe yogunlugu dusuyor) - bu yuzden asil GORUNURLUK
+       artisi dogrudan alfadan geliyor. CSS filter, birden fazla
+       drop-shadow() fonksiyonunu zincirleyip UST USTE bindirebilir -
+       YENI bir SVG elemani/katman GEREKMEDI, aynen ayni <rect>'in KENDI
+       filter'ine ikinci bir golge eklendi. Sonuc: cekirdek (stroke + ilk
+       golge) AYNEN eskisi gibi keskin kalirken, onun etrafinda ilk
+       mesaja OZEL, kompakt/balona-yapisik ikinci bir "hale" katmani ilk
+       mesajin enerji naklini daha guclu/canli hissettirir. Bu iki sinif
+       SADECE ilk mesajda kullanildigindan (bkz. cevreAkisiKur) sonraki
+       mesaj yuklemesi ETKILENMEDI. */
     .yaziyor-akis-cw {
         stroke: rgba(var(--yuzey-2), 0.92);
-        filter: drop-shadow(0 0 1.4px rgba(var(--yuzey-2), 0.5));
+        filter: drop-shadow(0 0 1.4px rgba(var(--yuzey-2), 0.5)) drop-shadow(0 0 5.5px rgba(var(--yuzey-2), 0.75));
     }
 
     .yaziyor-akis-ccw {
         stroke: rgba(var(--yuzey-2), 0.92);
-        filter: drop-shadow(0 0 1.4px rgba(var(--yuzey-2), 0.5));
+        filter: drop-shadow(0 0 1.4px rgba(var(--yuzey-2), 0.5)) drop-shadow(0 0 5.5px rgba(var(--yuzey-2), 0.75));
     }
 
     .yaziyor-akis-uc {
