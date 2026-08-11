@@ -296,21 +296,22 @@
        calisma-zamaninda eklenir (bkz. JS: cevreAkisiKur/cevreAkisiCalistir).
        Sonraki mesajlarda bu SVG hic olusturulmaz. DORT <rect>, balonun
        GERCEK olcusune/kose yaricapina gore JS'ten kurulur - ikisi "govde/iz"
-       (yaziyor-akis-yol: temas noktasindan buyuyen, YUMUSAK/soluk dolu kisim -
-       BU KATMAN ARTIK KALICI: %100 dolunca hicbir zaman soldurulmez/
-       kaldirilmaz, ilk mesajin nihai dis derisi olarak KALIR), ikisi "uc"
-       (yaziyor-akis-uc: govdenin o anki HAREKETLI ucunu takip eden, KISA/daha
-       parlak bir segment - "akan enerjinin nerede oldugunu" okunakli kilmak
-       icin; akis tamamlanmadan hemen once SONER, govde/iz'in duz nihai
-       gorunumune karisir). stroke-dasharray/-dashoffset Element.animate() ile
-       canlandirilir. overflow:visible ZORUNLU - SVG'nin varsayilani
-       "hidden"dir, aksi halde blur/stroke tasan kisimlari kirpilirdi. Renk/
-       kalinlik degerleri .yaziyor-yuzey'in (sonraki mesajlarda kullanilan,
-       DEGISMEYEN box-shadow katmani) ince/yumusak/kisitli gorunumune
-       YAKINLASTIRILDI - amac: akis tamamlaninca gorunumun .yaziyor-yuzey'den
-       fark edilemeyecek kadar yakin olmasi, cunku artik BASKA BIR KATMANA
-       "devredilmiyor" - bu govde/iz'in kendisi ilk mesajin nihai gorunumu
-       oluyor. */
+       (yaziyor-akis-yol: temas noktasindan buyuyen, GUCLU/BELIRGIN dolu
+       kisim - BU KATMAN KALICI: %100 dolunca hicbir zaman soldurulmez/
+       kaldirilmaz VE dimlenmez, ilk mesajin nihai dis derisi olarak KALIR),
+       ikisi "uc" (yaziyor-akis-uc: govdenin o anki HAREKETLI ucunu takip
+       eden, KISA/daha parlak bir segment - "akan enerjinin nerede oldugunu"
+       okunakli kilmak icin; akis tamamlanmadan hemen once SONER, govde/iz'in
+       duz nihai gorunumune karisir). stroke-dasharray/-dashoffset
+       Element.animate() ile canlandirilir. overflow:visible ZORUNLU -
+       SVG'nin varsayilani "hidden"dir, aksi halde stroke/drop-shadow tasan
+       kisimlari kirpilirdi. Govde/iz'in alfasi (0.92, KEZ KESKIN/bulanmamis
+       bir cekirdek olarak - bkz. asagi) VE opakligi (akis boyunca sabit 1)
+       kasitli olarak .yaziyor-yuzey'in (sonraki mesajlarin kullandigi,
+       DEGISMEYEN, cok daha soluk box-shadow katmani) gorunumunden BELIRGIN
+       SEKILDE DAHA GUCLU/PARLAK tutuldu - ilk mesajin "enerji nakli" hissi
+       icin gecmis rota HICBIR ZAMAN .yaziyor-yuzey'in soluk seviyesine
+       "sogumaz". */
     .yaziyor-akis {
         position: absolute;
         inset: -1px;
@@ -321,18 +322,39 @@
 
     .yaziyor-akis-yol {
         fill: none;
-        stroke-width: 2px;
+        stroke-width: 2.4px;
         stroke-linecap: round;
         stroke-dasharray: 0px 1px;
-        filter: blur(2.5px);
     }
 
+    /* CEKIRDEK/HALE ayrimi (SADECE ilk mesajin cevre-govde/iz'i - bu iki
+       sinif baska hicbir yerde kullanilmaz, bkz. cevreAkisiKur):
+       govde/iz ARTIK dogrudan blur() ile bulaniklastirilmiyor - eski
+       blur(2.5px), 2px'lik stroke'u neredeyse tamamen yumusak bir lekeye
+       donusturuyordu (KESKIN bir cekirdek hic OLUSMUYORDU) ve blur simetrik
+       yayildigi icin balonun İCİNE de disariyla AYNI miktarda tasip gri
+       kutunun kendisini mor bir ic-parlamaya donusturuyordu. Bunun yerine
+       stroke'un KENDI pikselleri ARTIK bulanmiyor (KESKIN/net kalir) -
+       SADECE arkasina/etrafina, drop-shadow ile kucuk (1.4px, eski blur'dan
+       daha DAR) bir yon-renkli hale eklendi. drop-shadow, kaynagin ALTINA
+       bir golge cizer, kaynagin GORUNUR pikselini bulaniklastirmaz - bu
+       yuzden "hareketli parlak uc -> arkasinda kalan keskin/guclu kablo"
+       hiyerarsisi govde/iz icin de kurulmus olur ve ic-tasma yaricapi
+       kuculdugu icin gri balon yuzeyine eskisinden daha az bulasir.
+       --yuzey-1/2'nin KENDISI (ton) DEGISMEDI, sadece bu iki kuralin
+       alfasi 0.85 -> 0.92 yukseltildi: cekirdek ARTIK bulanmadigindan,
+       hareketli ucun (alfa 1) yaninda "neredeyse ayni parlaklikta"
+       okunabilsin diye. .yaziyor-yuzey (sonraki mesajlarin kullandigi ayni
+       degiskenler) ve .yaziyor-akis-uc-cw/ccw'nin KENDI alfa/filter'i
+       ETKILENMEDI. */
     .yaziyor-akis-cw {
-        stroke: rgba(var(--yuzey-1), 0.55);
+        stroke: rgba(var(--yuzey-1), 0.92);
+        filter: drop-shadow(0 0 1.4px rgba(var(--yuzey-1), 0.5));
     }
 
     .yaziyor-akis-ccw {
-        stroke: rgba(var(--yuzey-2), 0.55);
+        stroke: rgba(var(--yuzey-2), 0.92);
+        filter: drop-shadow(0 0 1.4px rgba(var(--yuzey-2), 0.5));
     }
 
     .yaziyor-akis-uc {
@@ -1278,17 +1300,25 @@
     // Buyuk merkezi Şey'i TEK, surekli bir WAAPI animasyonuyla (konum + olcek +
     // opaklik AYNI kare dizisinde) yukleme balonunun GERCEK yuvarlatilmis
     // yuzeyindeki EN YAKIN temas noktasina tasir; TEMAS ANINDA (pTemas =
-    // seyahatSure) hem collapse baslar hem de AYNI anda cevre akisi
-    // (cevreAkisiKur ile EN BASTA kurulmus akis nesnesi, yeniden
-    // hesaplanmadan) tetiklenir - ikisi 160ms boyunca ORTUSUR. Akis, s0'dan
-    // saat yonu + saat yonunun tersine IKI cephe (govde/iz BUYUR, "uc"
-    // katmanlari daha parlak/HAREKETLI iki uc olarak govdenin onunde kosar)
-    // balonun karsi noktasinda bulusur, hale (enerjiKatmaniniEkle/
-    // enerjiyiCrossfadeEt) fillSuresi'nin son %20'sinde normal siddetine
-    // ulasir, temas rezervi (temasEnerjisiOlustur) akisla senkron dogar ve
-    // hizla soner, akis tamamlaninca (fillSuresi sonunda) rastgele tutamlar
-    // (yaziyorTutamlariBaslat) baslar - hicbir ayri "final skin" katmani
-    // eklenmez.
+    // seyahatSure/toplamSure) hem EMILIM (absorpsiyon, eskiki adiyla
+    // "collapse") baslar hem de AYNI anda cevre akisi (cevreAkisiKur ile EN
+    // BASTA kurulmus akis nesnesi, yeniden hesaplanmadan) tetiklenir -
+    // ikisi TEK bir paylasilan p (0 -> 1) ilerlemesiyle, TAM fillSuresi
+    // boyunca BIRLIKTE surer ve BIRLIKTE tamamlanir (collapseSure artik
+    // fillSuresi'ne esitlendi - eskiden 160ms'lik bagimsiz, cok daha kisa
+    // bir faz, cevre akisindan onlarca kare erken bitiyordu). Emilim govdeyi
+    // (rotate/scale/rotate deseniyle, balona-BAKAN kenar her p'de temas
+    // noktasina SABIT) surekli/monoton kucultup temas noktasina ceker;
+    // opaklik yalnizca son ~%20'de duser (tek basina bir "opacity-fade"
+    // DEGIL). Akis, s0'dan saat yonu + saat yonunun tersine IKI cephe
+    // (govde/iz BUYUR, "uc" katmanlari daha parlak/HAREKETLI iki uc olarak
+    // govdenin onunde kosar) balonun karsi noktasinda AYNI p=1 aninda
+    // bulusur, hale (enerjiKatmaniniEkle/enerjiyiCrossfadeEt) fillSuresi'nin
+    // son %20'sinde normal siddetine ulasir, temas rezervi
+    // (temasEnerjisiOlustur) akisla senkron dogar ve hizla soner, akis
+    // tamamlaninca (fillSuresi sonunda, emilim de TAM O ANDA biter) rastgele
+    // tutamlar (yaziyorTutamlariBaslat) baslar - hicbir ayri "final skin"
+    // katmani eklenmez.
     function parlamayiBalonaTasi(parlama, hedefBalon, satir) {
         var azaltilmisHareket = window.matchMedia &&
             window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1376,11 +1406,20 @@
 
         var seyahatSure = Math.max(650, Math.min(950, 650 + mesafe * 0.35));
 
-        // Collapse: temastan HEMEN sonra baslayan, 130-190ms araliginda kisa
-        // bir faz (160ms - araligin ortasi). toplamSure = seyahat + collapse;
-        // pTemas, kare dizisindeki seyahat-fazi offsetlerini (0..pTemas) TEK,
-        // surekli animasyonun toplam suresine gore yeniden olcekler.
-        var collapseSure = 160;
+        // fillSuresi: cevre akisinin (cevreAkisiCalistir, asagida) %0'dan
+        // %100'e dolma suresi - DEGERI DEGISMEDI (750ms), sadece tanimi
+        // yukari tasindi ki emilim (collapseSure) fazi da AYNI degeri
+        // paylassin (bkz. asagi).
+        var fillSuresi = 750;
+
+        // Emilim (absorpsiyon): temastan HEMEN sonra baslar ve ARTIK
+        // cevre-akisiyla (fillSuresi) TAM AYNI sureyi kapsar - eskiden sabit
+        // 160ms'lik, cevre akisindan bagimsiz kisa bir "collapse" fazi idi;
+        // bu YUZDEN govde cevre %100 dolmadan cok once gorunmez oluyordu.
+        // toplamSure = seyahat + emilim; pTemas, kare dizisindeki seyahat-
+        // fazi offsetlerini (0..pTemas) TEK, surekli animasyonun toplam
+        // suresine gore yeniden olcekler - DEGISMEDI.
+        var collapseSure = fillSuresi;
         var toplamSure = seyahatSure + collapseSure;
         var pTemas = seyahatSure / toplamSure;
 
@@ -1390,22 +1429,6 @@
         // hesaplanir). Onceden kabul edilmis AYNI formul - collapse fazinda
         // yeniden kullanildi, yeniden icat edilmedi.
         var tegetAci = Math.atan2(yonX, -yonY) * 180 / Math.PI;
-
-        // Collapse karesi (orta): govde balona-BAKAN NOKTAYA dogru "tutunumu
-        // kaybetmeye" baslar - normal eksen (sy) teget eksenden (sx) daha
-        // hizli kucculur, opaklik dusmeye baslar. Ikisi de temasOlcegi'nin
-        // ALTINDA kalir (asla buyumez, uzun oval olmaz).
-        var syOrta = temasOlcegi * 0.55;
-        var sxOrta = temasOlcegi * 0.85;
-        var dxOrta = temasDx + yonX * govdeYaricapi(syOrta);
-        var dyOrta = temasDy + yonY * govdeYaricapi(syOrta);
-
-        // Collapse karesi (son): govde neredeyse tamamen temas noktasina
-        // gomulur (derin normal-eksen sikismasi) ve opaklik 0'a duser.
-        var sySon = temasOlcegi * 0.12;
-        var sxSon = temasOlcegi * 0.35;
-        var dxSon = temasDx + yonX * govdeYaricapi(sySon);
-        var dySon = temasDy + yonY * govdeYaricapi(sySon);
 
         parlama.classList.remove("parlama-gizli");
 
@@ -1426,10 +1449,12 @@
         // RETAIN_ORANI: son ~%20 yaklasmada tekduze kuculmeyi hafifletip
         // temasta ESKI temasOlcegi'nden ~%15-25 daha dolgun bir govde
         // birakmak icin - "kucuk mor sprite" izlenimini duzeltir.
-        // temasOlcegi/dx/dy/mesafe/seyahatSure ve collapse (sxOrta/syOrta/
-        // sxSon/sySon, hepsi ESKI temasOlcegi'ne dayanir) HICBIR SEKILDE
-        // etkilenmez - sadece asagidaki iki kareye (pTemas*0.88 ve pTemas)
-        // uygulanir.
+        // temasOlcegi/dx/dy/mesafe/seyahatSure HICBIR SEKILDE etkilenmez.
+        // temasOlcegiKorunmus artik SADECE pTemas*0.88 karesinde DEGIL,
+        // asagidaki TUM emilim (p=0..1) egrisinin taban buyuklugu olarak da
+        // kullanilir (emilimOlcekSy/emilimOlcekSx) - govde temas anindan
+        // itibaren bu dolgun buyuklukten baslayip emilir, dogrudan
+        // KUCULTULMUS temasOlcegi'nden degil.
         var RETAIN_ORANI = 1.20;
         var temasOlcegiKorunmus = temasOlcegi * RETAIN_ORANI;
 
@@ -1442,40 +1467,77 @@
             return 1 - (1 - temasOlcegiKorunmus) * f;
         }
 
-        // CEKIM (son ~%12 yaklasma - MEVCUT temas karesine uygulanir, YENI
-        // KARE EKLENMEDI): govde, collapse fazinin AYNI rotate(tegetAci)
-        // scale(sx,sy) rotate(-tegetAci) deseniyle (yeniden icat edilmedi),
-        // gelis yonu boyunca (sy, normal eksen) hafifce uzar - "temas
-        // noktasina cekiliyor" hissi - dik yonde (sx, teget eksen) hafifce
-        // sikisir. Bu bir CARPMA/SICRAMA DEGIL - sapmalar KUCUK tutuldu.
+        // CEKIM sabitleri (DEGISMEDI): govde, gelis yonu boyunca (sy, normal
+        // eksen) hafifce uzar - "temas noktasina cekiliyor" hissi - dik
+        // yonde (sx, teget eksen) hafifce sikisir. Bu bir CARPMA/SICRAMA
+        // DEGIL - sapmalar KUCUK tutuldu. Eskiden SADECE temas karesine
+        // (p=0) uygulaniyordu; asagida emilimOlcekSy/Sx'in p=0 ucu olarak
+        // AYNEN korunuyor (emilimOlcekSy(0) === temasOlcegiKorunmus *
+        // PULL_UZUN, eskiki syTemas ile birebir ozdes).
         var PULL_UZUN = 1.16;  // gelis yonunde gerilme (~1.12-1.20)
         var PULL_DIK = 0.925;  // dik yonde sikisma (~0.90-0.95)
-        var syTemas = temasOlcegiKorunmus * PULL_UZUN;
-        var sxTemas = temasOlcegiKorunmus * PULL_DIK;
 
-        // Govdenin balona-BAKAN (on) kenari YINE AYNI hesaplanmis temas
-        // noktasina denk gelsin diye - collapse'in KENDI dxOrta/dyOrta'sinin
-        // KULLANDIGI AYNI govdeYaricapi(sy) teknigi, sadece yeni bir olcege
-        // uygulandi. s0/nearest-surface/temasDx/temasDy HICBIR SEKILDE
-        // degismedi - bu sadece asagidaki temas karesinin translate'ini
-        // hesaplar.
-        var dxTemasPull = temasDx + yonX * govdeYaricapi(syTemas);
-        var dyTemasPull = temasDy + yonY * govdeYaricapi(syTemas);
+        // EMILIM (absorpsiyon) egrisi - temastan (p=0) tam emilmeye (p=1)
+        // kadar TEK, paylasilan bir ilerleme degeri. Bu p, asagidaki
+        // setTimeout(..., seyahatSure) ile baslatilan cevreAkisiCalistir'in
+        // KENDI ilerlemesiyle (0 -> 1, sure=fillSuresi) es zamanlidir:
+        // - p=0 GERCEK zamani == offset pTemas'a bu animasyonda ulasilan an
+        //   == seyahatSure sonra calisan setTimeout'un ates aldigi an
+        //   (yani cevreAkisiCalistir'in KENDI p=0'i).
+        // - p=1 GERCEK zamani == offset 1'e ulasilan an == seyahatSure +
+        //   fillSuresi (collapseSure artik fillSuresi'ne esit) == cevre
+        //   akisinin KENDI p=1'i (sure=fillSuresi sonu).
+        // Iki ayri sayac YOK - offset formulu (pTemas + (1-pTemas)*p) AYNI
+        // p'yi bu tek WAAPI zaman cizelgesine gomer.
+        //
+        // Govde her p'de AYNI govdeYaricapi(sy) teknigiyle (yeniden icat
+        // edilmedi) balona-BAKAN kenarini temas noktasina SABIT tutar -
+        // govde kendi merkezi etrafinda kucculmez, kalan kutle temas
+        // noktasina dogru CEKILIR/emilir. Olcek p arttikca duz/monoton
+        // azalir (asla buyumez, sicramaz, tek bir "carpma" karesi yok).
+        // Opaklik p<=0.8 boyunca 1'de SABIT kalir - kaybolma saf bir
+        // "opacity-fade" DEGIL, neredeyse tamamen olcek/konum
+        // degisiminden gelir; yalnizca son ~%20'de, gomulmus kucuk kutle
+        // noktada gozden kaybolurken opaklik hizla 0'a iner.
+        function emilimOlcekSy(p) {
+            return temasOlcegiKorunmus * (PULL_UZUN - (PULL_UZUN - 0.05) * Math.pow(p, 1.6));
+        }
+        function emilimOlcekSx(p) {
+            return temasOlcegiKorunmus * (PULL_DIK - (PULL_DIK - 0.18) * Math.pow(p, 1.3));
+        }
+        function emilimOpaklik(p) {
+            return p <= 0.8 ? 1 : 1 - (p - 0.8) / 0.2;
+        }
+        function emilimKaresi(p) {
+            var sy = emilimOlcekSy(p);
+            var sx = emilimOlcekSx(p);
+            var dxp = temasDx + yonX * govdeYaricapi(sy);
+            var dyp = temasDy + yonY * govdeYaricapi(sy);
+            return {
+                transform: "translate(-50%, -50%) translate(" + dxp + "px, " + dyp + "px) rotate(" + tegetAci + "deg) scale(" + sx + ", " + sy + ") rotate(" + (-tegetAci) + "deg)",
+                opacity: emilimOpaklik(p),
+                offset: pTemas + (1 - pTemas) * p
+            };
+        }
 
         var kareler = [
             { transform: "translate(-50%, -50%) translate(0px, 0px) scale(1, 1)", opacity: 1, offset: 0 },
             { transform: "translate(-50%, -50%) translate(" + (dx * 0.5) + "px, " + (dy * 0.5) + "px) scale(" + olcekAra(0.5) + ", " + olcekAra(0.5) + ")", opacity: 1, offset: pTemas * 0.5 },
             { transform: "translate(-50%, -50%) translate(" + (dx * 0.88) + "px, " + (dy * 0.88) + "px) scale(" + olcekAraKorunmus(0.88) + ", " + olcekAraKorunmus(0.88) + ")", opacity: 1, offset: pTemas * 0.88 },
-            { transform: "translate(-50%, -50%) translate(" + dxTemasPull + "px, " + dyTemasPull + "px) rotate(" + tegetAci + "deg) scale(" + sxTemas + ", " + syTemas + ") rotate(" + (-tegetAci) + "deg)", opacity: 1, offset: pTemas },
-            { transform: "translate(-50%, -50%) translate(" + dxOrta + "px, " + dyOrta + "px) rotate(" + tegetAci + "deg) scale(" + sxOrta + ", " + syOrta + ") rotate(" + (-tegetAci) + "deg)", opacity: 0.4, offset: pTemas + (1 - pTemas) * 0.55 },
-            { transform: "translate(-50%, -50%) translate(" + dxSon + "px, " + dySon + "px) rotate(" + tegetAci + "deg) scale(" + sxSon + ", " + sySon + ") rotate(" + (-tegetAci) + "deg)", opacity: 0, offset: 1 }
+            emilimKaresi(0),
+            emilimKaresi(0.25),
+            emilimKaresi(0.5),
+            emilimKaresi(0.75),
+            emilimKaresi(0.92),
+            emilimKaresi(1)
         ];
 
-        // Seyahat + temas + KISA collapse TEK bir WAAPI animasyonunda oynar
+        // Seyahat + temas + emilim TEK bir WAAPI animasyonunda oynar
         // (fill:"forwards" son kareyi - opacity 0, temas noktasina gomulu
         // govde - kalici tutar). toplamSure aninda Şey'in animasyonu biter;
-        // asagidaki cevre-akisi/hale/rezerv-sonumu de AYNI ana (toplamSure)
-        // gore zamanlanir - bu YUZDEN "collapse biter bitmez" akis baslar.
+        // asagidaki cevre-akisi/hale/rezerv-sonumu de AYNI ana (seyahatSure)
+        // baslar ve AYNI sureyi (fillSuresi) paylasir - bu YUZDEN emilim ve
+        // cevre-guc-yayilimi birlikte ilerler ve birlikte tamamlanir.
         // Gercek POST navigasyonu (form submit zaten engellenmiyor) sayfayi
         // normal sekilde degistirecek; burada yapay bir gecikme eklenmedi.
         parlama.animate(kareler, {
@@ -1484,15 +1546,14 @@
             fill: "forwards"
         });
 
-        // fillSuresi (650-850ms hedefinin ortasina yakin) - cevre yuzeyinin
-        // %0'dan %100'e dolma suresi. DEGISMEDI.
-        var fillSuresi = 750;
-
-        // Akis, toplamSure (collapse BITISI) yerine seyahatSure'de (Şey'in
-        // balona GERCEKTEN degdigi an - kareler dizisindeki pTemas offset'i)
-        // baslar. Collapse (pTemas..1 arasi, 160ms) akisin ilk 160ms'siyle
-        // ORTUSUR - Şey collapse olurken cepheler ZATEN ayrilmaya baslamis
-        // olur. Collapse'in kendi suresi/geometrisi/transform'lari DEGISMEDI.
+        // fillSuresi zaten yukarida (collapseSure'un da paylastigi deger
+        // olarak) tanimlandi - burada YENIDEN bildirilmiyor.
+        //
+        // Akis, toplamSure (emilim BITISI) yerine seyahatSure'de (Şey'in
+        // balona GERCEKTEN degdigi an - kareler dizisindeki pTemas offset'i,
+        // p=0) baslar ve fillSuresi kadar surer - emilim de (collapseSure =
+        // fillSuresi) TAM AYNI p=0..1 penceresini kapladigi icin ikisi
+        // BASTAN SONA ORTUSUR, sadece son 160ms'lik bir kesisim degil.
         setTimeout(function () {
             // Griyi tasiyan zemin (.yaziyor-arkaplan) + --yuzey-1/2 renk
             // degiskenlerini acan .sonraki-hale sinifi BURADA, akis
@@ -1518,11 +1579,16 @@
             // Temas rezervi akisla TAM AYNI anda (senkron) olusturulur -
             // cepheler ayrilir ayrilmaz rezerv hemen sonmeye baslar (kisa bir
             // "el degistirme" - uzun sureli yuvarlak mor nokta YOK). Kendi
-            // fade-in'i (collapseSure*0.5) ile beliriyor, HEMEN ardindan
-            // asagidaki sonme animasyonu (%15'te ~0.30, %32'de 0) UZERINE
-            // biner - ikisinin baslangic degeri (opacity:1) AYNI oldugundan
-            // gorsel sicrama olmaz.
-            var temasEnerjisiEl = temasEnerjisiOlustur(akis.temasX, akis.temasY, Math.round(collapseSure * 0.5));
+            // fade-in'i (TEMAS_REZERV_FADE_SURE, bu kapsam disi elemanin
+            // ESKI 160ms'lik collapseSure*0.5'ine denk gelen SABIT 80ms -
+            // ARTIK fillSuresi'yle esitlenen collapseSure'a BAGLI DEGIL,
+            // boylece emilim suresi uzasa da bu kucuk noktanin belirme hizi
+            // DEGISMEZ) ile beliriyor, HEMEN ardindan asagidaki sonme
+            // animasyonu (%15'te ~0.30, %32'de 0) UZERINE biner - ikisinin
+            // baslangic degeri (opacity:1) AYNI oldugundan gorsel sicrama
+            // olmaz.
+            var TEMAS_REZERV_FADE_SURE = 80;
+            var temasEnerjisiEl = temasEnerjisiOlustur(akis.temasX, akis.temasY, TEMAS_REZERV_FADE_SURE);
             if (temasEnerjisiEl && temasEnerjisiEl.animate) {
                 temasEnerjisiEl.animate(
                     [
@@ -1638,12 +1704,15 @@
     // dasharray UZUNLUGU degisir, gercekten TEMAS NOKTASINDAN DISA DOGRU
     // BUYUYEN bir geometri.
     //
-    // Govde/iz'in KENDI stroke rengi (CSS'teki rgba(var(--yuzey-1/2), 0.55))
-    // SABIT kalir; element opacity'si TAZE_ORAN (~%35) boyunca 1'de kalip,
-    // sonra DINGINLESME_OPAKLIGI'na kadar yumusakca duser - akis
-    // TAMAMLANDIGINDA govde/iz CSS'teki 0.55 alfanin altina "sogur" ve
-    // .yaziyor-yuzey'in ince/kisitli gorunumune yaklasir. AYNI iki
-    // geometriden turetilen KISA, daha parlak "uc" segmentleri (cwUc/ccwUc)
+    // Govde/iz'in KENDI stroke rengi (CSS'teki rgba(var(--yuzey-1/2), 0.85) -
+    // ilk mesaja OZEL, sonraki mesajlarin kullandigi hicbir renk/katmanla
+    // PAYLASILMAZ) SABIT kalir; element opacity'si de TUM akis boyunca
+    // (baslangictan tamamlanmaya kadar) 1'de SABIT kalir - ONCEDEN burada
+    // TAZE_ORAN'dan sonra dusuk bir "dinlenme" opakligina soner, gecmis
+    // rotanin GORUNMEZ/SOLUK bir "deri"ye donusmesine yol acardi (perimeter
+    // gucun kaybolmus gibi gorunmesi). ARTIK govde/iz bir kere cizildikten
+    // sonra HICBIR SEKILDE dimlenmez - kablo, akim gectikce SUREKLI yuklu
+    // kalir. AYNI iki geometriden turetilen KISA, daha parlak "uc" segmentleri (cwUc/ccwUc)
     // govdenin o anki HAREKETLI ucunu takip eder (DASHOFFSET SABIT/degisken
     // formullerinden matematiksel olarak turetildi) - bunlar TAZE_ORAN
     // boyunca gecici olarak daha genis (UC_PARLAMA_GENISLIK) cizilip normal
@@ -1655,14 +1724,18 @@
     function cevreAkisiCalistir(akis, sure, tamamlaninca) {
         sure = sure || 750; // 650-850ms araliginda
 
-        // TAZE_ORAN: akisin ilk ~%35'i - hem govde/iz'in "taze" (opacity 1)
-        // kaldigi, hem "uc"un gecici olarak genisledigi pencere.
+        // TAZE_ORAN: akisin ilk ~%35'i - "uc"un gecici olarak genisledigi
+        // pencere (govde/iz icin ARTIK bir "taze/dinlenme" ayrimi yok, bkz.
+        // asagi).
         var TAZE_ORAN = 0.35;
-        // DINGINLESME_OPAKLIGI: TAZE_ORAN'dan sonra govde/iz'in element
-        // opacity'sinin sondugu carpan - CSS'teki 0.55 alfa ile carpilinca
-        // nihai/dinlenme gorunumu .yaziyor-yuzey'in kisitli yogunluguna
-        // yaklasir.
-        var DINGINLESME_OPAKLIGI = 0.55;
+        // KALICI_GUC_OPAKLIGI: govde/iz'in element opacity'si - BASTAN SONA
+        // (0 -> 1 offset) SABIT 1. ONCEDEN (DINGINLESME_OPAKLIGI) bu deger
+        // TAZE_ORAN'dan sonra 0.55'e dusuyordu; bu, CSS'teki stroke alfasiyla
+        // carpilinca gecmiste cizilmis butun rotanin (yeni cizilen kisim
+        // DAHIL) giderek soluklasmasina yol aciyordu - "kablo" akim
+        // gectikten sonra sonuyormus gibi gorunuyordu. Artik govde/iz bir
+        // kere cizildikten sonra HICBIR SEKILDE dimlenmiyor.
+        var KALICI_GUC_OPAKLIGI = 1;
 
         if (!akis.uzunluk || !akis.cwYol.animate) {
             // WAAPI/getTotalLength desteklenmiyorsa: govde/iz'i dogrudan
@@ -1672,10 +1745,10 @@
                 var Lf = akis.uzunluk, s0f = akis.s0;
                 akis.cwYol.style.strokeDasharray = (Lf / 2) + "px " + (Lf / 2) + "px";
                 akis.cwYol.style.strokeDashoffset = (-s0f) + "px";
-                akis.cwYol.style.opacity = DINGINLESME_OPAKLIGI;
+                akis.cwYol.style.opacity = KALICI_GUC_OPAKLIGI;
                 akis.ccwYol.style.strokeDasharray = (Lf / 2) + "px " + (Lf / 2) + "px";
                 akis.ccwYol.style.strokeDashoffset = (Lf / 2 - s0f) + "px";
-                akis.ccwYol.style.opacity = DINGINLESME_OPAKLIGI;
+                akis.ccwYol.style.opacity = KALICI_GUC_OPAKLIGI;
             }
             if (tamamlaninca) {
                 tamamlaninca();
@@ -1696,7 +1769,7 @@
             [
                 { strokeDasharray: "0px " + L + "px", strokeDashoffset: (-s0) + "px", opacity: 1, offset: 0 },
                 { strokeDasharray: (TAZE_ORAN * L / 2) + "px " + (L - TAZE_ORAN * L / 2) + "px", strokeDashoffset: (-s0) + "px", opacity: 1, offset: TAZE_ORAN },
-                { strokeDasharray: (L / 2) + "px " + (L / 2) + "px", strokeDashoffset: (-s0) + "px", opacity: DINGINLESME_OPAKLIGI, offset: 1 }
+                { strokeDasharray: (L / 2) + "px " + (L / 2) + "px", strokeDashoffset: (-s0) + "px", opacity: KALICI_GUC_OPAKLIGI, offset: 1 }
             ],
             { duration: sure, easing: "ease-out", fill: "forwards" }
         );
@@ -1705,7 +1778,7 @@
             [
                 { strokeDasharray: "0px " + L + "px", strokeDashoffset: (-s0) + "px", opacity: 1, offset: 0 },
                 { strokeDasharray: (TAZE_ORAN * L / 2) + "px " + (L - TAZE_ORAN * L / 2) + "px", strokeDashoffset: (-s0 + TAZE_ORAN * L / 2) + "px", opacity: 1, offset: TAZE_ORAN },
-                { strokeDasharray: (L / 2) + "px " + (L / 2) + "px", strokeDashoffset: (L / 2 - s0) + "px", opacity: DINGINLESME_OPAKLIGI, offset: 1 }
+                { strokeDasharray: (L / 2) + "px " + (L / 2) + "px", strokeDashoffset: (L / 2 - s0) + "px", opacity: KALICI_GUC_OPAKLIGI, offset: 1 }
             ],
             { duration: sure, easing: "ease-out", fill: "forwards" }
         );
