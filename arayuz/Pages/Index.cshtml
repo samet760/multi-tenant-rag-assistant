@@ -1423,11 +1423,50 @@
             return 1 - (1 - temasOlcegi) * f;
         }
 
+        // RETAIN_ORANI: son ~%20 yaklasmada tekduze kuculmeyi hafifletip
+        // temasta ESKI temasOlcegi'nden ~%15-25 daha dolgun bir govde
+        // birakmak icin - "kucuk mor sprite" izlenimini duzeltir.
+        // temasOlcegi/dx/dy/mesafe/seyahatSure ve collapse (sxOrta/syOrta/
+        // sxSon/sySon, hepsi ESKI temasOlcegi'ne dayanir) HICBIR SEKILDE
+        // etkilenmez - sadece asagidaki iki kareye (pTemas*0.88 ve pTemas)
+        // uygulanir.
+        var RETAIN_ORANI = 1.20;
+        var temasOlcegiKorunmus = temasOlcegi * RETAIN_ORANI;
+
+        // olcekAraKorunmus(f): olcekAra ile AYNI egri sekli, ama f=1'de
+        // ulasilan hedef temasOlcegi yerine dolgun temasOlcegiKorunmus -
+        // SADECE pTemas*0.88 karesinde (henuz cekim YOK, sadece dolgunluk)
+        // kullanilir; ilk yari (pTemas*0.5) MEVCUT olcekAra(0.5) ile
+        // DEGISMEDEN kalir.
+        function olcekAraKorunmus(f) {
+            return 1 - (1 - temasOlcegiKorunmus) * f;
+        }
+
+        // CEKIM (son ~%12 yaklasma - MEVCUT temas karesine uygulanir, YENI
+        // KARE EKLENMEDI): govde, collapse fazinin AYNI rotate(tegetAci)
+        // scale(sx,sy) rotate(-tegetAci) deseniyle (yeniden icat edilmedi),
+        // gelis yonu boyunca (sy, normal eksen) hafifce uzar - "temas
+        // noktasina cekiliyor" hissi - dik yonde (sx, teget eksen) hafifce
+        // sikisir. Bu bir CARPMA/SICRAMA DEGIL - sapmalar KUCUK tutuldu.
+        var PULL_UZUN = 1.16;  // gelis yonunde gerilme (~1.12-1.20)
+        var PULL_DIK = 0.925;  // dik yonde sikisma (~0.90-0.95)
+        var syTemas = temasOlcegiKorunmus * PULL_UZUN;
+        var sxTemas = temasOlcegiKorunmus * PULL_DIK;
+
+        // Govdenin balona-BAKAN (on) kenari YINE AYNI hesaplanmis temas
+        // noktasina denk gelsin diye - collapse'in KENDI dxOrta/dyOrta'sinin
+        // KULLANDIGI AYNI govdeYaricapi(sy) teknigi, sadece yeni bir olcege
+        // uygulandi. s0/nearest-surface/temasDx/temasDy HICBIR SEKILDE
+        // degismedi - bu sadece asagidaki temas karesinin translate'ini
+        // hesaplar.
+        var dxTemasPull = temasDx + yonX * govdeYaricapi(syTemas);
+        var dyTemasPull = temasDy + yonY * govdeYaricapi(syTemas);
+
         var kareler = [
             { transform: "translate(-50%, -50%) translate(0px, 0px) scale(1, 1)", opacity: 1, offset: 0 },
             { transform: "translate(-50%, -50%) translate(" + (dx * 0.5) + "px, " + (dy * 0.5) + "px) scale(" + olcekAra(0.5) + ", " + olcekAra(0.5) + ")", opacity: 1, offset: pTemas * 0.5 },
-            { transform: "translate(-50%, -50%) translate(" + (dx * 0.88) + "px, " + (dy * 0.88) + "px) scale(" + olcekAra(0.88) + ", " + olcekAra(0.88) + ")", opacity: 1, offset: pTemas * 0.88 },
-            { transform: "translate(-50%, -50%) translate(" + dx + "px, " + dy + "px) scale(" + temasOlcegi + ", " + temasOlcegi + ")", opacity: 1, offset: pTemas },
+            { transform: "translate(-50%, -50%) translate(" + (dx * 0.88) + "px, " + (dy * 0.88) + "px) scale(" + olcekAraKorunmus(0.88) + ", " + olcekAraKorunmus(0.88) + ")", opacity: 1, offset: pTemas * 0.88 },
+            { transform: "translate(-50%, -50%) translate(" + dxTemasPull + "px, " + dyTemasPull + "px) rotate(" + tegetAci + "deg) scale(" + sxTemas + ", " + syTemas + ") rotate(" + (-tegetAci) + "deg)", opacity: 1, offset: pTemas },
             { transform: "translate(-50%, -50%) translate(" + dxOrta + "px, " + dyOrta + "px) rotate(" + tegetAci + "deg) scale(" + sxOrta + ", " + syOrta + ") rotate(" + (-tegetAci) + "deg)", opacity: 0.4, offset: pTemas + (1 - pTemas) * 0.55 },
             { transform: "translate(-50%, -50%) translate(" + dxSon + "px, " + dySon + "px) rotate(" + tegetAci + "deg) scale(" + sxSon + ", " + sySon + ") rotate(" + (-tegetAci) + "deg)", opacity: 0, offset: 1 }
         ];
