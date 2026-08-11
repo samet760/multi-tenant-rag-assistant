@@ -1553,10 +1553,49 @@
             };
         }
 
+        // SEYAHAT (temas-oncesi) merkez konumu - DUZELTME: eskiden merkez,
+        // TEK bir SABIT hedef vektorun (dx,dy - SADECE temasOlcegi'nin KUCUK
+        // yaricapina gore hesaplanmisti) basit dogrusal kesri (dx*f) olarak
+        // hesaplaniyordu. Bu, o karenin GERCEK (cok daha buyuk) olcegini/
+        // yaricapini HIC hesaba katmiyordu - govdenin balona-BAKAN GERCEK
+        // kenari, "kucuk" yaricap varsayimina gore hesaplanmis merkeze gore,
+        // balonun İCİNE dogru erken tasabiliyordu (crescent/occlusion
+        // izlenimi). dx/dy/mesafe/seyahatSure KENDILERI DEGISMEDI (hala
+        // asagida mesafe/seyahatSure icin kullaniliyor) - SADECE bu iki ara
+        // karenin translate'i icin ARTIK kullanilmiyorlar.
+        //
+        // Duzeltme, emilimKaresi'nin (temas SONRASI) ZATEN kullandigi AYNI
+        // "merkez = kenar + yon*yaricap" ozdesligini (bkz. yukaridaki
+        // govdeYaricapi yorumu) temas-ONCESI fazina da tasir: govdenin
+        // balona-BAKAN kenari, baslangictaki GERCEK kenar konumundan
+        // (edgeBaslangicDx/Dy - olcek=1'deki govdeYaricapi ile, f=0'da
+        // translate(0,0)'i BIREBIR yeniden uretecek sekilde) temas
+        // noktasina (temasDx/Dy) DOGRUSAL olarak ilerler; merkez, HER
+        // karede O KARENIN GERCEK olcegine (olcekAra/olcekAraKorunmus,
+        // DEGISMEDI) gore govdeYaricapi(...) ile kenardan geriye dogru
+        // turetilir. Olcek/deformasyon egrisi, zamanlama (pTemas,
+        // offsetler), temas noktasi (s0/temasX/Y) ve emilimKaresi'nin
+        // KENDISI HICBIR SEKILDE degismedi - sadece bu iki ara karenin
+        // merkez KONUMU artik kendi GERCEK yaricapini hesaba katiyor.
+        var edgeBaslangicDx = -yonX * govdeYaricapi(1);
+        var edgeBaslangicDy = -yonY * govdeYaricapi(1);
+
+        function seyahatMerkezi(f, olcek) {
+            var kenarX = edgeBaslangicDx + (temasDx - edgeBaslangicDx) * f;
+            var kenarY = edgeBaslangicDy + (temasDy - edgeBaslangicDy) * f;
+            var r = govdeYaricapi(olcek);
+            return { x: kenarX + yonX * r, y: kenarY + yonY * r };
+        }
+
+        var seyahatOlcek50 = olcekAra(0.5);
+        var seyahatOlcek88 = olcekAraKorunmus(0.88);
+        var seyahatMerkez50 = seyahatMerkezi(0.5, seyahatOlcek50);
+        var seyahatMerkez88 = seyahatMerkezi(0.88, seyahatOlcek88);
+
         var kareler = [
             { transform: "translate(-50%, -50%) translate(0px, 0px) scale(1, 1)", opacity: 1, offset: 0 },
-            { transform: "translate(-50%, -50%) translate(" + (dx * 0.5) + "px, " + (dy * 0.5) + "px) scale(" + olcekAra(0.5) + ", " + olcekAra(0.5) + ")", opacity: 1, offset: pTemas * 0.5 },
-            { transform: "translate(-50%, -50%) translate(" + (dx * 0.88) + "px, " + (dy * 0.88) + "px) scale(" + olcekAraKorunmus(0.88) + ", " + olcekAraKorunmus(0.88) + ")", opacity: 1, offset: pTemas * 0.88 },
+            { transform: "translate(-50%, -50%) translate(" + seyahatMerkez50.x + "px, " + seyahatMerkez50.y + "px) scale(" + seyahatOlcek50 + ", " + seyahatOlcek50 + ")", opacity: 1, offset: pTemas * 0.5 },
+            { transform: "translate(-50%, -50%) translate(" + seyahatMerkez88.x + "px, " + seyahatMerkez88.y + "px) scale(" + seyahatOlcek88 + ", " + seyahatOlcek88 + ")", opacity: 1, offset: pTemas * 0.88 },
             emilimKaresi(0),
             emilimKaresi(0.25),
             emilimKaresi(0.5),
