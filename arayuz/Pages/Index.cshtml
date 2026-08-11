@@ -679,6 +679,62 @@
         var sonKareZamani = 0;
         var sonAlanZamani = 0;
 
+        // MANYETIK CEKIM (SADECE ilk mesaj Şey-seyahati sirasinda aktif -
+        // bkz. asagidaki window.__parlamaManyetikBaslat/manyetikKuvvetiUygula).
+        // Varsayilan durumda "aktif:false" - idle govde ve sonraki mesajlar
+        // bu mekanizmayi HICBIR ZAMAN tetiklemez, guc() daima 0 doner ve
+        // manyetikKuvvetiUygula() erken cikar (no-op). yonX/yonY EKRAN
+        // uzayinda balonun (temas noktasinin) bulundugu YONE dogru birim
+        // vektordur - #parlama pre-contact fazda hic dondurulmedigi icin
+        // (rotate() SADECE temas SONRASI, emilim fazinda baslar) bu, tuvalin
+        // KENDI yerel eksenleriyle birebir hizali kabul edilir.
+        var manyetik = { aktif: false, yonX: 0, yonY: 0, baslangicZamani: 0, sure: 1 };
+
+        // MANYETIK_BASLANGIC_ORANI: seyahatin ilk bu orani boyunca cekim
+        // SIFIRDIR (idle karakter buyuk olcude korunur, "~%50-55 normal"
+        // hedefi). Kalan dilimde smoothstep ile 0'dan 1'e sicramasiz
+        // yukselir - orta kisimda (~%25-30) ACIKCA GORULUR hale gelir, son
+        // ~%15-20'de tepe degerine (guc≈1) ulasilmis olur. ONCEKI deger
+        // (0.57) ile birlikte kuvvet sabitleri de dusuktu (bkz. asagi) -
+        // sonuc pratikte "son birkac karede" farkedilen, cok hafif bir
+        // etkiydi. Baslangic biraz erkene (0.52) cekildi VE kuvvetler
+        // asagida belirgin sekilde artirildi - asil GORUNURLUK farki
+        // BURADAN (siddet), sadece baslangic oranindan degil geliyor.
+        var MANYETIK_BASLANGIC_ORANI = 0.52;
+        // MANYETIK_ON_ORANI_MIN/MAX: bir parcacigin merkeze göre yon
+        // dogrultusundaki konumuna (align, -1..1) gore ne kadar guclu
+        // cekildigini olcekler - align=-1 (tam ARKA) icin MIN, align=+1
+        // (tam ON/lider) icin MAX kullanilir, ikisi arasinda DOGRUSAL
+        // geciş. MIN sifirin ustunde tutulur (0 degil) ki "butun kutlenin"
+        // cekildigi hissi korunsun; MAX ile arasindaki fark on tarafin
+        // GERGIN/uzayan, arka tarafin nispeten SAKIN/kompakt kalmasini
+        // saglar - iki AYRI, sabit lob DEGIL, HANGI parcaciklarin "on"da
+        // oldugu her zaman o anki prosedurel geometriye baglidir.
+        var MANYETIK_ON_ORANI_MIN = 0.18;
+        var MANYETIK_ON_ORANI_MAX = 1.0;
+        // MANYETIK_TANDRIL_KUVVETI/MANYETIK_CEKIRDEK_KUVVETI: taban kuvvet
+        // olcekleri (alanW ile carpilir, merkezVeSinirKuvvetiUygula'nin
+        // KENDI sabitleriyle (34/0.9) AYNI olcekte, ama DEGISTIRILMEDEN).
+        // Onceki degerler (2.6/0.5) net bir gorsel fark yaratmaya YETMIYORDU -
+        // burada BELIRGIN sekilde yukseltildi (yaklasik 2 kat) ki cekim
+        // normal oynatma hizinda ACIKCA GORULEBILSIN. Cekirdek carpani
+        // yine de tandrilden dusuk tutuldu - cekirdek ZATEN cok guclu bir
+        // merkeze-donus kuvvetine (k=34) sahip, bu yuzden bu artan kuvvet
+        // bile onu SINIRLI (yay-dengesi) bir mesafe kaydirir - govde
+        // kontrolsuzce firlamaz.
+        var MANYETIK_TANDRIL_KUVVETI = 5.5;
+        var MANYETIK_CEKIRDEK_KUVVETI = 0.85;
+        // MANYETIK_YAN_KUVVETI: yon vektorune DIK (90 derece) bir kuvvet -
+        // her tandril parcacigi KENDI SABIT manyetikYan katsayisina (bkz.
+        // parcacikOlustur, -1..1 rastgele) göre SOLA ya da SAGA, FARKLI
+        // miktarlarda itilir. "agirlik" (on/arka pay) ile CARPILDIGI icin
+        // bu yanal itki ON tarafta yogunlasir - govdenin balona-BAKAN
+        // tarafinda DUZENSIZ, birbirinden farkli "omuz"/lob cikintilari
+        // olusturur (sabit iki lob DEGIL - HER seyahatte hangi parcaciklarin
+        // ne kadar yana ittigi rastgele/prosedureldir). Sadece tandril
+        // parcaciklarina uygulanir (cekirdek MERKEZDE, hizali kalmali).
+        var MANYETIK_YAN_KUVVETI = 3.2;
+
         // Kontur yankilari: mevcut siluetin (kucukTuval) donmus, kucuk anlik goruntuleri -
         // yeni bir sekil UYDURULMAZ, sadece o anki govde formu disari dogru yonlu bir
         // sekilde genisletilip bulaniklastirilir ve soner (bkz. yankiOlustur/yankilariCiz).
@@ -736,7 +792,15 @@
                 proksimalKenar: null,
                 sonrakiZayifKuvvet: 0,
                 sonrakiYaricapKarari: 0,
-                serbestKaderi: null // "kaybol" | "geriDon" - kopunca rastgele atanir
+                serbestKaderi: null, // "kaybol" | "geriDon" - kopunca rastgele atanir
+                // manyetikYan: PARCACIK basina SABIT, -1..1 rastgele katsayi -
+                // SADECE manyetikKuvvetiUygula() tarafindan (guc>0 iken, yani
+                // SADECE ilk mesaj seyahatinin son diliminde) okunur; baska
+                // HICBIR yerde kullanilmadigi icin idle/normal fizigi ETKILEMEZ.
+                // Farkli parcaciklarin farkli/rastgele bu katsayiya sahip olmasi,
+                // manyetik cekim sirasinda govdenin DUZENSIZ/asimetrik "omuz"
+                // lobu olusturmasini saglar (sabit bir sablon degil).
+                manyetikYan: Math.random() * 2 - 1
             };
         }
 
@@ -916,6 +980,80 @@
             }
         }
 
+        // 3e-bis) Manyetik cekim gucu: manyetik.baslangicZamani'ndan bu yana
+        // gecen sureyi manyetik.sure'ye orantilar, MANYETIK_BASLANGIC_ORANI'na
+        // kadar 0 dondurur, sonrasinda smoothstep (3t^2-2t^3) ile SICRAMASIZ
+        // 0 -> 1 yukselir. manyetik.aktif false iken (idle/sonraki mesajlar)
+        // HER ZAMAN 0 doner.
+        function manyetikGuc(zamanMs) {
+            if (!manyetik.aktif) {
+                return 0;
+            }
+            var t = (zamanMs - manyetik.baslangicZamani) / manyetik.sure;
+            if (t <= MANYETIK_BASLANGIC_ORANI) {
+                return 0;
+            }
+            if (t >= 1) {
+                return 1;
+            }
+            var ilerleme = (t - MANYETIK_BASLANGIC_ORANI) / (1 - MANYETIK_BASLANGIC_ORANI);
+            return ilerleme * ilerleme * (3 - 2 * ilerleme);
+        }
+
+        // 3e-bis) Manyetik cekim kuvveti: guc<=0 iken TAMAMEN no-op (idle/
+        // sonraki mesajlar boylece HICBIR SEKILDE etkilenmez). guc>0 iken
+        // HER parcaciga (cekirdek DAHIL) manyetik.yonX/Y dogrultusunda bir
+        // EKSEN kuvveti uygular; siddet, o parcacigin merkeze göre yon
+        // dogrultusundaki konumuna (align, -1..1'e normallestirilmis) göre
+        // DOGRUSAL olarak degisir - "on" (align>0) parcaciklar MANYETIK_
+        // ON_ORANI_MAX'a, "arka" (align<0) parcaciklar MANYETIK_ON_ORANI_
+        // MIN'e yakin bir carpanla cekilir. AYRICA, SADECE tandril
+        // parcaciklarina, yon'a DIK bir YANAL kuvvet uygulanir - her
+        // parcacigin KENDI SABIT manyetikYan katsayisiyla (-1..1,
+        // parcacikOlustur'de atanir) ve AYNI on/arka agirlikla olceklenir,
+        // boylece govdenin balona-BAKAN tarafinda DUZENSIZ/asimetrik
+        // "omuz" cikintilari (bir kismi sola, bir kismi saga, FARKLI
+        // miktarlarda) belirir - sabit iki lob DEGIL. Govdenin BAGLANTI
+        // TOPOLOJISI (yayKuvvetleriUygula/baglariKopart/yenidenBaglan)
+        // HICBIR SEKILDE degistirilmedi - bu, var olan govdeye eklenen
+        // BASKA BIR KUVVET SINIFIDIR (vortexKuvvetiUygula ile ayni
+        // duzeyde); govde nadiren dogal kopma/yeniden-baglanma yasayabilir
+        // (HER ZAMAN oldugu gibi, bu davranis DEGISTIRILMEDI), ama YENI bir
+        // parca/nesne YARATILMAZ.
+        function manyetikKuvvetiUygula(zamanMs) {
+            var guc = manyetikGuc(zamanMs);
+            if (guc <= 0) {
+                return;
+            }
+
+            var merkezX = alanW / 2, merkezY = alanH / 2;
+            var yarim = (alanW / 2) || 1;
+            // yon'a dik birim vektor (90 derece dondurulmus) - yanal/omuz
+            // kuvveti icin.
+            var dikX = -manyetik.yonY, dikY = manyetik.yonX;
+
+            for (var i = 0; i < tumParcaciklar.length; i++) {
+                var p = tumParcaciklar[i];
+                var dx = p.x - merkezX, dy = p.y - merkezY;
+                var align = (dx * manyetik.yonX + dy * manyetik.yonY) / yarim;
+                align = Math.max(-1, Math.min(1, align));
+
+                var agirlik = 0.5 + 0.5 * align; // 0 (tam arka) .. 1 (tam on)
+                var oran = MANYETIK_ON_ORANI_MIN + (MANYETIK_ON_ORANI_MAX - MANYETIK_ON_ORANI_MIN) * agirlik;
+                var tabanKuvvet = p.tur === "cekirdek" ? MANYETIK_CEKIRDEK_KUVVETI : MANYETIK_TANDRIL_KUVVETI;
+                var kuvvet = guc * oran * tabanKuvvet * alanW;
+
+                p.fx += manyetik.yonX * kuvvet;
+                p.fy += manyetik.yonY * kuvvet;
+
+                if (p.tur === "tandril") {
+                    var yanKuvvet = guc * agirlik * p.manyetikYan * MANYETIK_YAN_KUVVETI * alanW;
+                    p.fx += dikX * yanKuvvet;
+                    p.fy += dikY * yanKuvvet;
+                }
+            }
+        }
+
         // 3f) Yirtilma: bir baglantinin uzunlugu, dogal mesafesinin GERME_ESIGI katini
         // asarsa bir sayac islemeye baslar; bu durum yeterince uzun surerse (kenara ozel,
         // rastgele belirlenmis bir sure) baglanti TAMAMEN kopar. Bu, gecerli parcacik
@@ -1047,6 +1185,7 @@
             yayKuvvetleriUygula();
             merkezVeSinirKuvvetiUygula();
             vortexKuvvetiUygula(zamanMs);
+            manyetikKuvvetiUygula(zamanMs);
 
             for (var j = 0; j < tumParcaciklar.length; j++) {
                 var p = tumParcaciklar[j];
@@ -1295,6 +1434,35 @@
         } else {
             requestAnimationFrame(dongu);
         }
+
+        // Disariya acilan TEK kanca: SADECE ilk mesaj Şey-seyahati (bkz.
+        // parlamayiBalonaTasi, ayri bir <script> blogunda/global kapsamda)
+        // bu fonksiyonu, kendi seyahatSure'siyle TAM AYNI anda cagirir -
+        // baska HICBIR cagiran YOK, bu yuzden idle/sonraki-mesaj davranisi
+        // ETKILENMEDI. yonX/yonY: EKRAN uzayinda, balonun/temas noktasinin
+        // bulundugu yone dogru vektor (birim olmasi ZORUNLU degil, burada
+        // normallestirilir). sure: manyetik cekimin 0 -> guclu araligini
+        // kat edecegi ms - cagiran taraf seyahatSure'yi verir, boylece
+        // cekim tam temas anina denk gelecek sekilde tepe noktasina ulasir.
+        window.__parlamaManyetikBaslat = function (yonX, yonY, sure) {
+            var uzunluk = Math.sqrt(yonX * yonX + yonY * yonY) || 1;
+            manyetik.aktif = true;
+            manyetik.yonX = yonX / uzunluk;
+            manyetik.yonY = yonY / uzunluk;
+            manyetik.baslangicZamani = performance.now();
+            manyetik.sure = Math.max(1, sure);
+        };
+
+        // Manyetik cekimi NOTRE dondurur - parlamayiBalonaTasi, temas anindan
+        // (seyahatSure sonra calisan ZATEN VAR OLAN setTimeout icinde) bunu
+        // cagirir. Boylece "aktif" durumu, seyahat/temas fazi disina asla
+        // TASMAZ - #parlama zaten bu andan sonra sadece emilir/görünmez olur
+        // ve BASKA hicbir sey (idle, sonraki mesaj) onu yeniden BASLATMADIGI
+        // icin bu, gecici seyahat durumunun kaza sonucu miras kalmayacagini
+        // GARANTI eden ek bir guvenlik adimidir.
+        window.__parlamaManyetikBitir = function () {
+            manyetik.aktif = false;
+        };
     })();
 </script>
 
@@ -1491,13 +1659,25 @@
         var RETAIN_ORANI = 1.20;
         var temasOlcegiKorunmus = temasOlcegi * RETAIN_ORANI;
 
-        // olcekAraKorunmus(f): olcekAra ile AYNI egri sekli, ama f=1'de
-        // ulasilan hedef temasOlcegi yerine dolgun temasOlcegiKorunmus -
-        // SADECE pTemas*0.88 karesinde (henuz cekim YOK, sadece dolgunluk)
-        // kullanilir; ilk yari (pTemas*0.5) MEVCUT olcekAra(0.5) ile
-        // DEGISMEDEN kalir.
+        // olcekAraKorunmus(f): f=1'de ULASILAN HEDEF (temasOlcegiKorunmus)
+        // DEGISMEDI - SADECE egrinin SEKLI dogrusaldan (f) f^OLCEK_
+        // KORUNMUS_USSU'ye (USSU>1, "ease-in") degistirildi. Bu fonksiyon
+        // SADECE pTemas*0.88 karesinde cagrilir (ilk yari, pTemas*0.5,
+        // MEVCUT olcekAra(0.5) ile DEGISMEDEN kalir - o fonksiyona HIC
+        // dokunulmadi). USSU>1 oldugu icin f<1 icin f^USSU < f, yani egri
+        // 1'e (baslangic buyuklugune) daha uzun sure YAKIN kalip kucculme
+        // esas olarak f=1'e (temasa) yaklasirken yogunlasir - "temas-oncesi
+        // seyahatin son ~%40-50'sinde DAHA AZ agresif kucculme" hedefi
+        // boylece SADECE bu tek karenin (0.88) DEGERINI yukseltir (~0.40 ->
+        // ~0.50), erken/orta seyahati (pTemas*0.5 karesi) etkilemeden.
+        // seyahatOlcek88/seyahatMerkez88 bu fonksiyonun DONUS DEGERINI
+        // OKUYARAK govdeYaricapi(...) uzerinden radius-aware konumu yeniden
+        // hesapladigi icin (bkz. asagida seyahatMerkezi cagrisi), bu tek
+        // degisiklik otomatik olarak GEOMETRIK OLARAK TUTARLI kalir - ayrica
+        // hicbir yer elle guncellenmedi.
+        var OLCEK_KORUNMUS_USSU = 2.4;
         function olcekAraKorunmus(f) {
-            return 1 - (1 - temasOlcegiKorunmus) * f;
+            return 1 - (1 - temasOlcegiKorunmus) * Math.pow(f, OLCEK_KORUNMUS_USSU);
         }
 
         // CEKIM sabitleri (DEGISMEDI): govde, gelis yonu boyunca (sy, normal
@@ -1618,6 +1798,20 @@
             fill: "forwards"
         });
 
+        // Prosedurel govdeye (ayri <script> blogundaki fizik motoruna)
+        // manyetik-cekim yonunu/suresini bildirir - SADECE ilk mesaj
+        // seyahati bu kancayi cagirir, bu yuzden idle/sonraki mesaj
+        // davranisi ETKILENMEDI. Yon, "yonX/yonY" (disariya-dogru, balonun
+        // GELDIGI yon) ile TERS (-yonX,-yonY) verilir - manyetik cekim
+        // balonun/temas noktasinin bulundugu yone dogru olmali. Sure olarak
+        // seyahatSure verilir ki cekim TAM temas anina denk gelecek sekilde
+        // tepe noktasina ulassin (bkz. window.__parlamaManyetikBaslat).
+        // Fonksiyon yoksa (beklenmedik durum) sessizce atlanir - govde
+        // yine de DUZGUN seyahat eder, sadece manyetik bukulme olmaz.
+        if (window.__parlamaManyetikBaslat) {
+            window.__parlamaManyetikBaslat(-yonX, -yonY, seyahatSure);
+        }
+
         // fillSuresi zaten yukarida (collapseSure'un da paylastigi deger
         // olarak) tanimlandi - burada YENIDEN bildirilmiyor.
         //
@@ -1627,6 +1821,15 @@
         // fillSuresi) TAM AYNI p=0..1 penceresini kapladigi icin ikisi
         // BASTAN SONA ORTUSUR, sadece son 160ms'lik bir kesisim degil.
         setTimeout(function () {
+            // Manyetik cekimi TAM temas aninda notre dondurur - guc() zaten
+            // bu noktadan sonra bir daha okunmayacaktir (govde emiliyor),
+            // ama "aktif" bayragini burada kapatmak, gecici seyahat
+            // durumunun baska HICBIR SEKILDE (kaza/yeniden kullanim)
+            // sizamayacagini garanti eder (bkz. window.__parlamaManyetikBitir).
+            if (window.__parlamaManyetikBitir) {
+                window.__parlamaManyetikBitir();
+            }
+
             // Griyi tasiyan zemin (.yaziyor-arkaplan) + --yuzey-1/2 renk
             // degiskenlerini acan .sonraki-hale sinifi BURADA, akis
             // baslamadan HEMEN once devreye girer - .yaziyor-akis-cw/ccw'nin
