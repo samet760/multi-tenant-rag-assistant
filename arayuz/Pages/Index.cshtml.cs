@@ -56,6 +56,11 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
+        if (string.IsNullOrWhiteSpace(Soru))
+        {
+            return Page();
+        }
+
         var istemci = new HttpClient();
         var tenant = User.FindFirst("tenant_id")!.Value;
         var eposta = User.Identity!.Name;

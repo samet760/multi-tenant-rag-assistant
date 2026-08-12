@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model arayuz.Pages.IndexModel
 
 @{
@@ -587,7 +587,7 @@
 
         <form method="post" id="soru-formu" class="d-flex gap-2 mx-auto mb-5 px-3" style="max-width:800px; width:100%;">
             <input type="hidden" name="SohbetId" value="@Model.SohbetId" />
-            <input asp-for="Soru" class="form-control soru-formu-girdi flex-grow-1" placeholder="Sorunuzu yazın" />
+            <input asp-for="Soru" class="form-control soru-formu-girdi flex-grow-1" placeholder="Sorunuzu yazın" required />
             <button type="submit" class="btn btn-primary soru-formu-dugme" id="sor-dugmesi">Sor</button>
         </form>
     </div>
@@ -678,15 +678,6 @@
 
         var sonKareZamani = 0;
         var sonAlanZamani = 0;
-
-        // sonBilinenManyetikGuc: SADECE alanDegerlendir'in cekirdek-lobu
-        // hesabinda kullanilan, YUMUSATILMIS bir manyetikGuc() OKUMASI - bkz.
-        // asagida alanDegerlendir. manyetikGuc/manyetik.aktif/__parlamaManyetikBaslat/
-        // Bitir'in KENDISI DEGISTIRILMEDI; bu SADECE temas aninda guc()'un
-        // 1'den 0'a ANINDA dusmesi (Bitir cagrilinca) durumunda alanin bir
-        // render karesinde "duz yuvarlaga" SICRAMASINI onlemek icin eklenen,
-        // ayri bir yardimci degisken.
-        var sonBilinenManyetikGuc = 0;
 
         // MANYETIK CEKIM (SADECE ilk mesaj Şey-seyahati sirasinda aktif -
         // bkz. asagidaki window.__parlamaManyetikBaslat/manyetikKuvvetiUygula).
@@ -1025,43 +1016,6 @@
             return ilerleme * ilerleme * (3 - 2 * ilerleme);
         }
 
-        // MANYETIK_GORSEL_BASLANGIC_ORANI/MANYETIK_GORSEL_TAM_ORANI: SADECE
-        // manyetikGorselGuc() (asagida) tarafindan kullanilir - manyetikGuc()'un
-        // KENDI MANYETIK_BASLANGIC_ORANI'sini (partikul kuvvetleri/cekirdek
-        // sertligi icin, DEGISMEDI) ETKILEMEZ.
-        var MANYETIK_GORSEL_BASLANGIC_ORANI = 0.30;
-        var MANYETIK_GORSEL_TAM_ORANI = 0.68;
-
-        // manyetikGorselGuc(zamanMs): manyetikGuc() ile AYNI paylasilan
-        // durumu (manyetik.aktif/baslangicZamani/sure) okur - YENI bir
-        // zamanlayici/durum EKLENMEDI - ama SADECE gorsel skaler-alan lob
-        // deformasyonu (bkz. alanDegerlendir) icin FARKLI, DAHA ERKEN
-        // baslayan ve daha erken tam guce ulasip ORADA KALAN bir egri
-        // uretir: t<=0.30 (seyahatin ilk ~%30'u) 0, 0.30-0.68 arasi
-        // smoothstep ile SICRAMASIZ 0->1, t>=0.68'den (yani gercek temastan,
-        // t=1'den, ONCE) itibaren KALICI olarak 1 - govde temasa kadar
-        // acikca deforme GORUNMEYE devam eder, tek kare/son-anlik bir etki
-        // olmaz. Partikul kuvvetlerinin (manyetikKuvvetiUygula), cekirdek
-        // sertliginin (merkezVeSinirKuvvetiUygula) VE tandril kuvvetlerinin
-        // kullandigi manyetikGuc()/MANYETIK_BASLANGIC_ORANI'ye HICBIR SEKILDE
-        // dokunulmadi - bu fonksiyonlar hala AYNI (0.52'de baslayan, t=1'e
-        // kadar yukselen) egriyi kullanir; sadece GORUNEN lob geometrisi
-        // daha erken/daha uzun sure tam guce sahip.
-        function manyetikGorselGuc(zamanMs) {
-            if (!manyetik.aktif) {
-                return 0;
-            }
-            var t = (zamanMs - manyetik.baslangicZamani) / manyetik.sure;
-            if (t <= MANYETIK_GORSEL_BASLANGIC_ORANI) {
-                return 0;
-            }
-            if (t >= MANYETIK_GORSEL_TAM_ORANI) {
-                return 1;
-            }
-            var ilerlemeGorsel = (t - MANYETIK_GORSEL_BASLANGIC_ORANI) / (MANYETIK_GORSEL_TAM_ORANI - MANYETIK_GORSEL_BASLANGIC_ORANI);
-            return ilerlemeGorsel * ilerlemeGorsel * (3 - 2 * ilerlemeGorsel);
-        }
-
         // 3e-bis) Manyetik cekim kuvveti: guc<=0 iken TAMAMEN no-op (idle/
         // sonraki mesajlar boylece HICBIR SEKILDE etkilenmez). guc>0 iken
         // HER parcaciga (cekirdek DAHIL) manyetik.yonX/Y dogrultusunda bir
@@ -1278,83 +1232,9 @@
         // etrafinda yumusatilmis bir alfaya cevirir ve kucuk tuvale yazar. Bu fonksiyon
         // parcaciklarin nereden geldigini (cekirdek/tandril/serbest) bilmez - sadece
         // duz bir x/y/r listesi okur, bu yuzden yeni hareket modeliyle degismeden calisir.
-        //
-        // MANYETIK CEKIRDEK ALAN DAGILIMI (ilk mesaj manyetik cekimi icin -
-        // tani, cekirdegin FIZIKSEL kaydirilmasinin (bkz. merkezVeSinirKuvvetiUygula'daki
-        // manyetik esneklik) TEK BASINA siluette yeterince buyuk/okunakli bir
-        // degisim yaratamayacagini gosterdi; cekirdek govdenin en baskin alan
-        // katkicisidir - onu fiziksel olarak degil, SADECE bu render adiminda,
-        // alan hesabinda birden fazla ortusukmerkez olarak temsil etmek daha
-        // dogrudan bir kontrol noktasi). manyetikCekirdekGucu<=0 iken (idle,
-        // onset-oncesi, temas SONRASI, sonraki mesajlar - manyetikGorselGuc()
-        // bu durumlarin HEPSINDE 0 doner) cekirdekLoblari HICBIR ZAMAN kurulmaz
-        // ve asagidaki parcacik dongusu cekirdek icin AYNI TEK r²/(d²+1)
-        // terimini uretir - bugunku render BIREBIR AYNI kalir. guc>0 iken
-        // (SADECE ilk mesaj seyahatinin son diliminde), cekirdegin katkisi
-        // GERCEK konumu (cekirdek.x/y) etrafinda, birbirini GUCLU orten dort
-        // "sanal merkeze" (ana + on lob + iki yan/omuz lobu) dagitilir -
-        // hicbiri gercek parcacik DEGILDIR (tumParcaciklar'a eklenmez, hiz/
-        // yay/yirtilma'ya sahip degildir, SADECE bu tek kare hesabinda
-        // yasayan gecici skaler-alan katkilaridir). Agirliklar (0.52+0.28+
-        // 0.10*yan1+0.10*yan2) orijinal r²'ye YAKIN toplam kalacak sekilde
-        // secildi (asiri buyume degil, YENIDEN DAGITIM). Yon manyetik.yonX/Y
-        // (DEGISTIRILMEDI, zaten doğrulanmis), asimetri cekirdek.manyetikYan
-        // (parcacikOlustur'de BIR KEZ atanan, PARCACIK OMRU boyunca SABIT
-        // deger) uzerinden turetilir - boylece "asimetri icin sabit bir
-        // tohum" gereksinimi, YENI bir rastgele durum EKLEMEDEN, ONCEDEN VAR
-        // OLAN bu alan yeniden kullanilarak karsilanir; kare-basina rastgelelik
-        // YOK, bu yuzden titreme olmaz. Kullanilan guc degeri
-        // manyetikGuc()'un HAM sonucu DEGIL - GORSEL egri manyetikGorselGuc()
-        // (yukarida, DAHA ERKEN baslayip DAHA ERKEN tam guce ulasan ayri bir
-        // zamanlama) uzerinden okunur, sonra sonBilinenManyetikGuc (bkz.
-        // yukarida) ile hafifce yumusatilir - bu, SADECE temas aninda
-        // (__parlamaManyetikBitir cagrilip guc() aninda 0'a dusunce) lobların
-        // bir render karesinde duz yuvarlaga SICRAMASINI onler. Partikul
-        // kuvvetlerinin kullandigi manyetikGuc()'un KENDISI/zamanlamasi
-        // degismedi - SADECE bu render fonksiyonunun okudugu ilerleme egrisi
-        // degisti.
-        function alanDegerlendir(zamanMs) {
+        function alanDegerlendir() {
             var veri = alanVerisi.data;
             var idx = 0;
-
-            var manyetikHedefGuc = manyetikGorselGuc(zamanMs || performance.now());
-            sonBilinenManyetikGuc += (manyetikHedefGuc - sonBilinenManyetikGuc) * 0.35;
-            if (sonBilinenManyetikGuc < 0.002) {
-                sonBilinenManyetikGuc = 0;
-            }
-            var manyetikCekirdekGucu = sonBilinenManyetikGuc;
-            var cekirdekLoblari = null;
-            if (manyetikCekirdekGucu > 0 && cekirdek) {
-                var dikX = -manyetik.yonY, dikY = manyetik.yonX;
-                var yan1Katsayi = 0.85 + cekirdek.manyetikYan * 0.35;
-                var yan2Katsayi = 0.85 - cekirdek.manyetikYan * 0.35;
-                var r2 = cekirdek.r * cekirdek.r;
-                // Kaymalar (SADECE bu ucu, agirlik/yaricap/formul DEGISMEDI):
-                // ONCEKI degerler (0.95/0.55/0.35 * cekirdek.r) lob
-                // merkezlerini birbirine COK yakin birakiyordu - ortusen
-                // katkilar esikleme sonrasi neredeyse TEK bir yuvarlak alana
-                // geri "eriyordu" (goze carpan bir siluet degisimi
-                // OLMUYORDU). Kasitli olarak KARARLI sekilde ~2 kat
-                // artirildi - on lob artik cekirdek yaricapinin NEREDEYSE
-                // IKI KATI kadar disari cikabiliyor, omuz loblari da hem
-                // dikine hem ileri yonde belirgin sekilde daha uzakta -
-                // esikleme sonrasi govde artik acikca yonlu/asimetrik
-                // gerilmis okunuyor, ama agirliklar (0.52/0.28/0.10*yan1/
-                // 0.10*yan2) hala GUCLU bir ortusme saglayacak kadar
-                // buyuk oldugundan (bkz. yukarida, DEGISMEDI) tum loblar
-                // TEK bir baglantili kutle olarak esiklenmeye devam eder -
-                // ayrik daireler OLUSMAZ.
-                var onKaymasi = cekirdek.r * 1.85 * manyetikCekirdekGucu;
-                var yanKaymasi = cekirdek.r * 1.10 * manyetikCekirdekGucu;
-                var yanOnPay = cekirdek.r * 0.70 * manyetikCekirdekGucu;
-
-                cekirdekLoblari = [
-                    { x: cekirdek.x, y: cekirdek.y, r2: r2 * 0.52 },
-                    { x: cekirdek.x + manyetik.yonX * onKaymasi, y: cekirdek.y + manyetik.yonY * onKaymasi, r2: r2 * 0.28 },
-                    { x: cekirdek.x + manyetik.yonX * yanOnPay + dikX * yanKaymasi, y: cekirdek.y + manyetik.yonY * yanOnPay + dikY * yanKaymasi, r2: r2 * 0.10 * yan1Katsayi },
-                    { x: cekirdek.x + manyetik.yonX * yanOnPay - dikX * yanKaymasi, y: cekirdek.y + manyetik.yonY * yanOnPay - dikY * yanKaymasi, r2: r2 * 0.10 * yan2Katsayi }
-                ];
-            }
 
             for (var gy = 0; gy < GRID_H; gy++) {
                 var py = (gy + 0.5) / GRID_H * alanH;
@@ -1364,16 +1244,6 @@
 
                     for (var n = 0; n < tumParcaciklar.length; n++) {
                         var nuk = tumParcaciklar[n];
-
-                        if (nuk === cekirdek && cekirdekLoblari) {
-                            for (var lb = 0; lb < cekirdekLoblari.length; lb++) {
-                                var lob = cekirdekLoblari[lb];
-                                var ldx = px - lob.x, ldy = py - lob.y;
-                                toplam += lob.r2 / (ldx * ldx + ldy * ldy + 1);
-                            }
-                            continue;
-                        }
-
                         var dx = px - nuk.x;
                         var dy = py - nuk.y;
                         toplam += (nuk.r * nuk.r) / (dx * dx + dy * dy + 1);
@@ -1559,7 +1429,7 @@
 
             if (zamanMs - sonAlanZamani >= ALAN_HEDEF_ARALIGI) {
                 sonAlanZamani = zamanMs;
-                alanDegerlendir(zamanMs);
+                alanDegerlendir();
                 sivyiCiz(zamanMs);
             }
 
@@ -1575,7 +1445,7 @@
         if (azaltilmisHareket) {
             // Tek, statik bir kare: surekli simulasyon calistirilmaz.
             fizigiGuncelle(performance.now(), 0);
-            alanDegerlendir(performance.now());
+            alanDegerlendir();
             sivyiCiz(performance.now());
         } else {
             requestAnimationFrame(dongu);
@@ -1930,15 +1800,845 @@
             emilimKaresi(1)
         ];
 
+        // =====================================================================
+        // DETERMINISTIK SON-YAKLASIM + EMILIM (ilk mesaj SADECE). Seyahatin ilk
+        // DET_MORPH_BASLANGIC_ORANI orani TAMAMEN prosedurel kalir (#parlama'nin
+        // KENDI kareler/WAAPI animasyonu, asagida DEGISMEDI) - govdenin
+        // "duzensiz/manyetik karakteri" bu asamada HICBIR SEKILDE etkilenmez.
+        // Seyahatin SON diliminde, TAMAMEN AYRI, position:fixed bir viewport
+        // canvas'i devralir ve govde/boyun/uc'u KAPALI-FORM Bezier yollarla
+        // cizer - alanDegerlendir/metaball/SDF/esik YOK, konum/boyut HER KAREDE
+        // acikca bilinen sayilardir. Ayarlanabilir TUM sabitler TEK blokta
+        // gruplanmistir - ileride kucuk gorsel ayarlar icin BASKA HICBIR YERE
+        // dokunmak GEREKMEZ.
+        // DET_MORPH_BASLANGIC_ORANI: TANI (kullanici geri bildirimi, ikinci
+        // tur) - 0.42'de bile govde GORULEBILIR bir sure (yolun ~%40'i)
+        // SADECE prosedurel/yuvarlak kaliyordu, boylece goz "bu top" diye
+        // KILITLENEBILIYORDU - sonra deterministik devraldiginda, RENK/HALE/
+        // TITREME AYNI olsa BILE, bu "once A, sonra B" ALGISI "birden
+        // donusuyor" gibi okunuyordu. Stil eslestirmesi (hale/3-renk/
+        // titreme) dogru yonde ama TEK BASINA yetmiyordu - ASIL sorun
+        // GECISIN KENDISI, gozun ayirt edebilecegi bir "ONCE/SONRA" ani
+        // olmasi. Cozum: gecisi NEREDEYSE BASA (0.05) cekmek - govde yola
+        // ciktiktan HEMEN sonra (seyahatSure'nin ilk ~%5'i, tipik ~35-50ms)
+        // deterministik canvas devralir, boylece "kilitlenecek" bir
+        // yuvarlak-SADECE donem KALMAZ - govde BASTAN itibaren (m=0'dan)
+        // SUREKLI ve kademeli olarak incelirken gorunur, ayrik bir "donusum
+        // ani" YOKTUR. detMorphSuresi artik seyahatSure'nin ~%95'i - taper
+        // icin cok daha fazla kare/zaman.
+        var DET_MORPH_BASLANGIC_ORANI = 0.05;
+        var DET_GECIS_SURESI = 100;                   // ms - #parlama -> canvas crossfade suresi (istek #6, 80-120ms araliginda)
+        var DET_GOVDE_ARKA_KATSAYI = 1.05;            // govde "arka kutup" mesafesi = govdeYariGenislik * bu
+        var DET_GOVDE_KAIDE_PAY_ORANI = 0.5;          // govde merkezi, boyun kaidesinin govdeYariGenislik*bu KADAR gerisinde
+        var DET_GOVDE_YARIGENISLIK_BASLANGIC = 1.00;  // m=0'da govde yari-genisligi (handoffYaricap'a gore)
+        // DET_GOVDE_YARIGENISLIK_BITIS: TANI (kullanici geri bildirimi) - 0.80
+        // ile govde SADECE %20 kuculuyordu, boylece boyun uzayip incelse BILE
+        // govdenin KENDISI yaklasma boyunca hep "kocaman" kaliyordu ("yaklastikca
+        // cok daha incelsin hala kocaman bisey geliyo"). Simdi govde de (boyun
+        // gibi) belirgin sekilde kuculuyor - govde/boyun-kaidesi/uc ORANLARI
+        // (DET_BOYUN_KAIDE_ORANI_BITIS vb.) govdeYariGenislik'e GORE tanimli
+        // oldugundan, onlarin MUTLAK genislikleri de otomatik olarak orantili
+        // kucculur - ayrica degistirilmeleri GEREKMEZ.
+        var DET_GOVDE_YARIGENISLIK_BITIS = 0.22;      // m=1'de govde yari-genisligi - TANI (kullanici geri bildirimi, altinci tur) "govde hala buyuk kaliyor", 0.32'den dusuruldu
+        // DET_BOYUN_UZUNLUK_BASLANGIC/DET_BOYUN_KAIDE_ORANI_BASLANGIC/
+        // DET_UC_YARIGENISLIK_BASLANGIC: TANI (kullanici geri bildirimi,
+        // dorduncu tur - "cok inceden baslayip sonra normal olmasi") -
+        // ONCEDEN bu ucu, m=0'da boyun NEREDEYSE YOK (0.05) ve uc HALA
+        // NISBETEN KALIN (0.42) baslayip govdeyle BIRLIKTE zamanla
+        // uzuyor/inceliyordu - ilk birkac karede goz hala "sade, duz bir
+        // top" goruyordu, ince/uzun kisim BELIRGINLESMESI biraz zaman
+        // aliyordu. Kullanicinin onayladigi cozum: SADECE govde (top kismi)
+        // GERCEK el-degistirme boyutuyla (detHandoffYaricap - boyut
+        // sicramasi OLMAMASI icin ZORUNLU) baslayip m=1'e kadar kucculmeye
+        // DEVAM eder (DET_GOVDE_YARIGENISLIK_BASLANGIC/BITIS DEGISMEDI) -
+        // ama BOYUN/UC artik m=0'da ZATEN kendi BITIS (nihai) degerlerinde
+        // baslar (BASLANGIC=BITIS) - "gorunumu ilk kareden itibaren zaten
+        // ince/uzun, sadece govde zaman icinde kucculuyor" (DET_*_ASAMA_*
+        // staged-growth pencereleri bu iki boyut icin artik ETKISIZ kalir -
+        // BASLANGIC=BITIS oldugundan interpolasyon deltasi sifirdir, kod
+        // KIRILMAZ, sadece no-op olur).
+        // DET_BOYUN_UZUNLUK_GOVDE_ORANI: TANI (kullanici geri bildirimi,
+        // altinci tur - "ikisinde de 0.5'lerde iyi gibi") - boyun uzunlugu
+        // ONCEDEN SABIT bir handoffYaricap katiydi (1.35), govde ise m
+        // ilerledikce (1.00'dan 0.32'ye) KUCULUYORDU - bu, govde/kuyruk
+        // ORANININ zamanla (m=0'dan m=1'e, hatta emilimde de) NEREDEYSE 3
+        // KATINA CIKMASINA yol aciyordu (govde kucup kuyruk SABIT kalinca,
+        // kuyruk giderek ORANTISIZ uzun görünüyordu) - SADECE orta bir
+        // noktada (govde/kuyruk rastgele dengeye geldigi an) "iyi"
+        // gorunuyordu, uclarda BOZULUYORDU. Simdi boyun uzunlugu SABIT
+        // DEGIL - CARI govdeYariGenislik'e ORANLI (boyunKaideYariGenislik
+        // gibi) - govde kuculdukce kuyruk da ORANTILI kisalir, gorunum
+        // (govde:kuyruk orani) m=0'dan m=1'e KADAR SABIT/tutarli kalir.
+        var DET_BOYUN_UZUNLUK_GOVDE_ORANI = 2.8;      // TANI (kullanici geri bildirimi, altinci tur) "kuyruk biraz daha uzun olsun, boylece daha ince gorunsun", 2.0'dan artirildi
+        // DET_BOYUN_KAIDE_ORANI_BASLANGIC/BITIS: TANI (kullanici geri
+        // bildirimi, besinci tur - "gövde kocaman oldu") - 0.42 degeri,
+        // boyunKaide->uc SUREKLI/kesintisiz daralan bir egrinin SADECE
+        // GECICI bir ARA-DEGERIYDI (hicbir zaman uzun sure o genislikte
+        // KALINMIYORDU). DET_UC_INCELME_BASLANGIC_T (asagida) ile bu deger
+        // artik segmentin %80'inde SABIT bir PLATO genisligi oldu - govdenin
+        // %42'si bir PLATO icin HALA KALIN (govde+plato tek buyuk, kesintisiz
+        // bir kutle gibi gorunuyordu, "govde kocaman"). Simdi 0.15 - plato
+        // GERCEKTEN ince bir "kuyruk" gibi okunuyor (govde -> hizli omuz
+        // daralmasi -> ince, sabit kuyruk -> son %20'de ipince uca cokme).
+        var DET_BOYUN_KAIDE_ORANI_BASLANGIC = 0.15;   // boyunKaideYariGenislik/govdeYariGenislik orani, m=0 - ARTIK m=1 ile AYNI (bkz. yukarida TANI)
+        var DET_BOYUN_KAIDE_ORANI_BITIS = 0.15;       // ayni oran, m=1 (ve emilim boyunca SABIT kullanilir)
+        // DET_UC_YARIGENISLIK_BASLANGIC/BITIS: TANI (kullanici geri
+        // bildirimi, dorduncu tur) - "ipince, ince ince ince" - 0.14->0.07->
+        // 0.035->0.02->0.01, DET_UC_INCELME_BASLANGIC_T (asagida) ile
+        // BIRLIKTE gercekten ipince bir yakinsama icin.
+        var DET_UC_YARIGENISLIK_BASLANGIC = 0.01;     // m=0'da uc yari-genisligi - ARTIK m=1 ile AYNI (bkz. yukarida TANI)
+        var DET_UC_YARIGENISLIK_BITIS = 0.01;         // m=1'de uc yari-genisligi - ipince, neredeyse bir nokta
+        // DET_*_ASAMA_*: TANI (kullanici geri bildirimi) - ONCEKI surumde bu
+        // pencereler GEC BASLIYORDU (orn. boyun 0.20'den once HIC uzamiyordu) -
+        // kisa toplam surede (eski DET_MORPH_BASLANGIC_ORANI=0.62) bu, govdenin
+        // UZUN SURE hic degismiyormus gibi durup SONRA hepsinin BIRDEN
+        // olusmasina ("sivrilme birden beliriyor") yol aciyordu. Simdi UCU DE
+        // m=0'DAN ITIBAREN hareket eder (BEKLEME YOK) - sadece TAMAMLANMA
+        // sıraları farkli (omuz erken, boyun orta, uc gec biter) - boylece
+        // "asamali" his hala var ama goz HICBIR ZAMAN "hicbir sey olmuyor"
+        // hissetmez, degisim m=0'dan itibaren SUREKLI okunur.
+        var DET_OMUZ_ASAMA_BASLANGIC = 0.00, DET_OMUZ_ASAMA_BITIS = 0.40;
+        var DET_UC_ASAMA_BASLANGIC = 0.00, DET_UC_ASAMA_BITIS = 1.00;
+        // DET_ALAN_*: govde/boyun/uc siluetinin CIZIM yontemi - TANI (kullanici
+        // geri bildirimi, ucuncu tur): el-yapimi Bezier kontrol noktalari
+        // ("detYolCiz", kaldirildi) simetrik/sabit/"tasarlanmis" gorunuyordu,
+        // topun sahip oldugu akiskan/kararsiz karakteri tasimiyordu. Bunun
+        // yerine, ayni sayfanin KENDI kabul edilmis govde motorunun
+        // (alanDegerlendir, yukarida) AYNI teknigi kullanilir: govdeden uca
+        // dizilmis birden fazla dairesel "alan kaynagi"nin degerleri toplanir,
+        // bir esikte kesilir - kaynaklar arasindaki boyun EL DEGMEDEN, saf
+        // matematikle (r^2/(d^2+1) toplami) olusur, kink/bowtie/simetri sorunu
+        // YAPISAL OLARAK imkansizdir. ESIK/ESIK_YUMUSAKLIGI degerleri,
+        // alanDegerlendir'in KENDI (ESIK=1, ESIK_YUMUSAKLIGI=0.35)
+        // sabitleriyle AYNI - ama BAGIMSIZ kopyalar (idle govdenin zamanla
+        // degisen ESIK'ine BAGLI DEGIL, bu canvas TAMAMEN AYRI kalir).
+        // TANI (kullanici geri bildirimi): SABIT sayida (9) kaynak, boyun
+        // KISAYKEN (ozellikle el-degistirme anindaki m≈0) neredeyse AYNI
+        // noktaya YIGILIYORDU - metaball alanlari TOPLANDIGI icin bu, tek bir
+        // kaynagin OLMASI GEREKENDEN KAT KAT guclu bir alan uretip esik
+        // asimini govdenin cok DISINA tasiyordu (govde OLMASI-GEREKENDEN
+        // buyuk gorunuyor VE bbox kenarindaki payi asip SERT/dortgen bir
+        // kenar - "kare icinde donusum" - birakiyordu, ozellikle sora basildigi
+        // andaki el-degistirme sirasinda). DET_ALAN_KAYNAK_SAYISI artik SABIT
+        // DEGIL, bir TAVAN - detAlanKaynaklariUret kaynak SAYISINI/konumlarini
+        // ADAPTIF ADIMLAMAYLA turetir (bkz. asagida, TANI ucuncu tur): govde
+        // tarafinda (kalin) BUYUK adimlar/az nokta, uc tarafinda (ince)
+        // KUCUK adimlar/cok nokta - yogunluk TAM ihtiyac duyulan yerde
+        // birikir. TAVAN yine de bir GUVENLIK sinirlamasi (sonsuz donguyu
+        // ONLER) - uc COK inceldiginde (ör. 0.02) bile yeterli yogunluga izin
+        // vermesi icin YUKSEK tutulur (grid kucuk oldugundan maliyeti ucuz
+        // kalir).
+        // DET_ALAN_GRID_U/V: TANI (kullanici geri bildirimi - "cok piksel
+        // piksel") - kenar guvenlik payi (DET_ALAN_PAY_ORANI) buyudukce, AYNI
+        // sabit ızgara SABIT sayida ornek ile GITTIKCE DAHA GENIS bir dunya-
+        // alanini kapsamak zorunda kaliyor - bu da orneklem cozunurlugunu
+        // (birim basina piksel) dusurup kenarlari bloklu/pikselli
+        // gosteriyordu. Cozunurluk ~4.5x artirildi - maliyet HALA ucuz
+        // (kucuk bir ızgara, sadece bu canvas icin, alanDegerlendir'in KENDI
+        // 144x144+cok-parcacik maliyetinden dusuk).
+        var DET_ALAN_GRID_U = 192, DET_ALAN_GRID_V = 108;
+        var DET_ALAN_ESIK = 1;
+        var DET_ALAN_ESIK_YUMUSAKLIGI = 0.35;
+        var DET_ALAN_MIN_KAYNAK_SAYISI = 3;
+        var DET_ALAN_KAYNAK_SAYISI = 60;             // TAVAN (guvenlik siniri, artik yogunluk ADAPTIF)
+        var DET_ALAN_KAYNAK_ARALIK_ORANI = 0.95;      // adaptif adim boyu = o anki yerel yaricap * bu
+        var DET_ALAN_PAY_ORANI = 2.8; // bbox kenar paylari = en buyuk kaynak yaricapi * bu (blur/hale + guvenlik payi)
+        // DET_EMILIM_*: emilim sonu (istek #9/#10) - govde/uc tabanlari
+        // ONCEKINDEN DAHA KUCUK (govde 0.15->0.10, uc 0.30->0.22) ki boyun
+        // sifira inerken govde de AYNI hizda kuculsun (bkz. istek - "boyun
+        // gidince govde bir TOP gibi kalmasin"); opaklik penceresi DAHA GEC
+        // baslar ve DAHA KISA (0.93->0.96) - geometri ISI'nin BUYUK KISMINI
+        // yapar, opaklik SADECE gercekten kucuk kalan son parcayi temizler.
+        var DET_EMILIM_GOVDE_TABAN_ORANI = 0.10;
+        var DET_EMILIM_UC_TABAN_ORANI = 0.22;
+        var DET_EMILIM_OPAKLIK_BASLANGIC_ORANI = 0.96;
+        // DET_HALE_*/DET_TITREME_*: TANI (kullanici geri bildirimi) - govde
+        // gecisi hala "bir sekil kaybolup baska bir sekil beliriyor" gibi
+        // okunuyordu; sebep ZAMANLAMA degil, GORUNUM UYUSMAZLIGIYDI - eski
+        // (prosedurel) govde 3 renkli gradyan + ALTINDA bulanik bir hale
+        // pasi (bkz. pasoCiz/gradyanOlustur) + fizikten gelen organik
+        // titreklik ile cizilirken, bu (deterministik) govde SADECE 2 renkli
+        // duz bir vektor dolgusuydu - "canli/akiskan" DEGIL "temiz/vektorel"
+        // gorunuyordu. DET_HALE_BULANIKLIK_ORANI/DET_HALE_ALFA: detCizimYap'a
+        // eklenen, pasoCiz'in KENDI teknigini (buyutulmus+bulanik+dusuk-alfa
+        // pas, SONRA keskin dolgu) yansitan ikinci bir alt-pas icin.
+        // DET_TITREME_GENISLIK_ORANI/DET_TITREME_HIZI: metaball kaynak
+        // merkezlerine (bkz. detAlanKaynaklariUret) eklenen KUCUK, zamanla
+        // dalgalanan sinuzoidal sapma - govde ARTIK dumduz/donuk bir vektor
+        // degil, hafifce "nefes alan" bir siluete sahip (istek: "akiskan
+        // kararsiz yapisini korumasi").
+        var DET_HALE_BULANIKLIK_ORANI = 0.28; // hale pasi blur px'i = detHandoffYaricap * bu
+        var DET_HALE_ALFA = 0.30;             // hale pasinin opakligi (pasoCiz'in kendi 0.3'u ile AYNI)
+        var DET_HALE_BUYUME_ORANI = 0.10;      // hale pasinin govdeden ne kadar buyuk cizildigi (govdeYariGenislik * bu)
+        var DET_TITREME_GENISLIK_ORANI = 0.09; // titreme genligi = detHandoffYaricap * bu - TANI (kullanici geri bildirimi, "biraz daha unstablelik") 0.05'ten artirildi
+        var DET_TITREME_HIZI = 0.006;          // titreme frekansi (ms basina radyan)
+        // DET_TITREME_SAKINLESME_BASLANGIC_ORANI: TANI (kullanici geri
+        // bildirimi) - "uca yakin yerde durgun/duz olsun, ama gerisi kararsiz
+        // olsun" - ucU'nun bu oranindan ITIBAREN (detAlanKaynaklariUret'te)
+        // titreme genligi 1'den 0'a SONMEYE baslar, boylece govde/orta-boyun
+        // ENERJIK/kararsiz kalirken tam uc SAKIN/duz durur - sivri ucun
+        // netligi titremeyle BOZULMAZ.
+        var DET_TITREME_SAKINLESME_BASLANGIC_ORANI = 0.82;
+        // DET_UC_INCELME_BASLANGIC_T/DET_UC_EASE_KUVVETI: TANI (kullanici
+        // geri bildirimi, dorduncu tur - "ucun yuzde 20'si ipince olsun sonra
+        // buyusun") - boyunKaide->uc segmentinin ILK DET_UC_INCELME_
+        // BASLANGIC_T'si (govdeye YAKIN kisim, ör. %80) boyunKaideYariGenislik'te
+        // SABIT/kalin kalir ("buyusun" - govde/boyun tarafi buyuk kalsin),
+        // SADECE UCA EN YAKIN kalan kisim (son %20) t2^DET_UC_EASE_KUVVETI ile
+        // (kuvvet>1, egim yavas baslar/HIZLANIR) HIZLA ipince ucYariGenislik'e
+        // coker - inceligin TAMAMI, uzunlugun KUCUK bir kismina sikistirilir
+        // (bkz. asagida DET_UC_YARIGENISLIK_*).
+        var DET_UC_INCELME_BASLANGIC_T = 0.80;
+        var DET_UC_EASE_KUVVETI = 2;
+        // DET_SALINIM_*: TANI (kullanici geri bildirimi) - "ilk baştaki
+        // seyimiz gibi giderken oynasin, saga sola calkalansin" - detTitreme
+        // HER kaynagi KENDI, birbirinden BAGIMSIZ fazda hafifce itiyordu -
+        // yerel/mikro bir "nefes alma" veriyordu ama TUM govdenin BIR ARADA
+        // gorunur sekilde sallanmasi hissini VERMIYORDU. detSalinim TEK bir
+        // YAVAS sinus - TUM kaynaklara AYNI ANDA/AYNI fazda eklenir (ayrica
+        // DET_TITREME_SAKINLESME_BASLANGIC_ORANI'nin ayni sonumlemesiyle uca
+        // dogru sifira iner) - bir kirbacin sapi sallanirken ucunun hedefte
+        // SABIT kalmasi gibi, TAM uctaki kaynak (u=ucU) HER ZAMAN v=0'da
+        // kalir (temas noktasi kesinligi BOZULMAZ). TANI (sayisal dogrulama):
+        // genlik SABIT detHandoffYaricap'a gore olunca, govde/uc emilim
+        // sirasinda kucculdukce (govdeYariGenislik/ucYariGenislik tabanlara
+        // dogru kuculur) sallanti ORANTISIZ BUYUK kalip komsu kaynaklari
+        // birbirinden KOPARIYORDU (koprulenme garantisi bozuluyordu). Bunun
+        // yerine genlik CARI govdeYariGenislik'e GORE (detTitreme'nin KENDI
+        // yaricap-orantili guvenlik mantigiyla AYNI ilke) - govde/uc
+        // kuculdukce sallanti da ORANTILI kuculur, koprulenme HER ZAMAN
+        // korunur.
+        var DET_SALINIM_GENISLIK_ORANI = 0.16; // salinim genligi = CARI govdeYariGenislik * bu (sonumlenmeden ONCE)
+        // DET_SALINIM_HIZI: TANI (kullanici geri bildirimi, "garip ve yavas") -
+        // 0.0022 ile bir tam salinim donguSU ~2860ms suruyordu, ama seyahatSure
+        // SADECE 650-950ms (bkz. asagida seyahatSure) - yani KISA yolculuk
+        // boyunca sinüsün SADECE ilk ceyreginden AZI goruluyordu: bu, ileri-geri
+        // bir SALLANMA degil, TEK yone yavasca YATAN/surüklenen garip bir hareket
+        // gibi okunuyordu. Simdi ~300ms'lik bir periyotla (yolculuk boyunca 2-3
+        // GORULEBILIR tam salinim) COK daha hizli.
+        var DET_SALINIM_HIZI = 0.020;          // salinim frekansi (ms basina radyan)
+        // DET_ANTICIPASYON_*: TANI (kullanici geri bildirimi, ikinci tur) -
+        // "sorunca bi anda donusum geciriyo, once hafif sola gitsin sonra
+        // yavas yavas ucu cikmaya baslasin" - el-degistirme (m=0) ANINDA
+        // govde/boyun/uc ZATEN nihai oranlarina gore degismeye BASLIYORDU -
+        // goze "ani" geliyordu. ILK DENEME (DET_ANTICIPASYON_ORANI=0.12)
+        // YETERSIZDI: crossfade (DET_GECIS_SURESI=100ms) SUREBOYUNCA
+        // deterministik canvas ZATEN yariden az saydamliktan cikiyordu -
+        // 0.12'lik pencere (~90ms, crossfade ile HEMEN HEMEN AYNI sure) tam
+        // TAM opak olana kadar coktan bitmis oluyordu, goz "hazirlik" anini
+        // HIC GORMIYORDU. Simdi IKI net asama VAR: m'nin ilk (ORANI*CIL_ORANI)
+        // kismi HIZLI bir yanal "çil" (yari-sinus tumsek), SONRA (CIL_ORANI
+        // sonundan ORANI'ya kadar) TAMAMEN DURGUN bir bekleme (govde/boyun/uc
+        // hala SABIT, ekstra kayma YOK, sadece surekli titreme/salinim devam
+        // eder) - boylece crossfade bitip TAM opak oldugunda goz once "cil"i,
+        // sonra AYRI/belirgin bir durgunluk anini gorur, ANCAK ONDAN SONRA
+        // (m > ORANI) asil incelme baslar.
+        var DET_ANTICIPASYON_ORANI = 0.30;
+        var DET_ANTICIPASYON_CIL_ORANI = 0.40;
+        var DET_ANTICIPASYON_GENISLIK_ORANI = 0.16;
+
+        var detCanvas = null, detCtx = null, detRafId = null;
+        var detFaz = "beklemede"; // "beklemede" | "morph" | "emilim" | "bitti"
+        var detMorphBaslangicZamani = 0, detMorphSuresi = 1, detEmilimBaslangicZamani = 0;
+        var detTemasWorld = { x: akis.temasX, y: akis.temasY };
+        // detDirX/Y: GOVDE -> TEMAS (contactDir) - yonX/Y'nin (disariya-dogru,
+        // TEMAS -> GOVDE) TERSI. Bu isaret onceki bir gorevde denklemlerden
+        // KANITLANMISTI (manyetik.yonX/Y de AYNI -yonX,-yonY kuralini kullanir,
+        // bkz. asagida __parlamaManyetikBaslat cagrisi) - burada TEKRAR
+        // turetilmiyor, AYNI kanitlanmis kural yeniden kullaniliyor.
+        var detDirX = -yonX, detDirY = -yonY;
+        var detPerpX = -detDirY, detPerpY = detDirX;
+        var detAci = Math.atan2(detDirY, detDirX); // detYerelNokta'nin (u,v)->(x,y) rotasyonuyla AYNI aci, seyahat boyunca SABIT
+        var detHandoffYaricap = 1, detTipBaslangic = { x: 0, y: 0 };
+        var detGovdeYariGenislikM1 = 0, detUcYariGenislikM1 = 0;
+        var detGovdeRenk1 = "", detGovdeRenkOrta = "", detGovdeRenk2 = "";
+
+        // detAlanKucukTuval/detAlanVerisi: alanDegerlendir'in KENDI (kucukTuval/
+        // alanVerisi) desenini yansitan, dusuk-cozunurluklu yerel maske tuvali -
+        // her karede detAlanDegerlendir tarafindan YENIDEN doldurulur, boyutu
+        // SABITTIR (DET_ALAN_GRID_U/V). detGeciciTuval/detGeciciCtx: pasoCiz'in
+        // KENDI gecici-tuval teknigini yansitan, ekran boyutunda AYRI bir
+        // offscreen tuval - detMorphBaslat'ta (asagida) detCanvas ile BIRLIKTE
+        // olusturulur, DOM'a hic eklenmez (procedural gecici Tuval gibi).
+        var detAlanKucukTuval = document.createElement("canvas");
+        detAlanKucukTuval.width = DET_ALAN_GRID_U;
+        detAlanKucukTuval.height = DET_ALAN_GRID_V;
+        var detAlanKucukBaglam = detAlanKucukTuval.getContext("2d");
+        var detAlanVerisi = detAlanKucukBaglam.createImageData(DET_ALAN_GRID_U, DET_ALAN_GRID_V);
+        var detGeciciTuval = null, detGeciciCtx = null;
+
+        function detSmoothstep(x) {
+            x = x < 0 ? 0 : (x > 1 ? 1 : x);
+            return x * x * (3 - 2 * x);
+        }
+
+        // detPencere: m<=baslangic'ta 0, m>=bitis'te 1, arada smoothstep -
+        // detMorphCiz'in omuz/boyun/uc icin AYRI, KENDI m-pencerelerinde
+        // (istek #7) ilerlemesini saglayan kucuk, saf yardimci. Eski
+        // (kaldirilmis) skaler-alan sisteminin BIR PARCASI DEGIL - SADECE
+        // deterministik canvas'in KENDI zamanlama-evresi icin.
+        function detPencere(m, baslangic, bitis) {
+            return detSmoothstep((m - baslangic) / (bitis - baslangic));
+        }
+
+        // detKubikBezier/detEase: emilim (p) icin, cevreAkisiCalistir'in KENDI
+        // "ease-out" (CSS cubic-bezier(0,0,0.58,1)) egrisiyle AYNI SEKLI kucuk
+        // bir Newton-Raphson cozucuyle uretir (istek #10 - govde-tuketimi ve
+        // cevre-doluşu AYNI orani paylassin). cevreAkisiCalistir'in KENDISI
+        // (asagida) HICBIR SEKILDE degistirilmedi/yeniden yazilmadi - bu SADECE
+        // AYNI egri SEKLINI, canvas-cizim rAF dongusu icin bagimsizca yeniden
+        // hesaplayan kucuk bir yardimci.
+        function detKubikBezier(x1, y1, x2, y2) {
+            function nokta(t, a, b) {
+                var it = 1 - t;
+                return 3 * it * it * t * a + 3 * it * t * t * b + t * t * t;
+            }
+            function egim(t, a, b) {
+                var it = 1 - t;
+                return 3 * it * it * a + 6 * it * t * (b - a) + 3 * t * t * (1 - b);
+            }
+            return function (x) {
+                if (x <= 0) { return 0; }
+                if (x >= 1) { return 1; }
+                var t = x;
+                for (var i = 0; i < 6; i++) {
+                    var fx = nokta(t, x1, x2) - x;
+                    var d = egim(t, x1, x2);
+                    if (Math.abs(d) < 1e-6) { break; }
+                    t -= fx / d;
+                    t = t < 0 ? 0 : (t > 1 ? 1 : t);
+                }
+                return nokta(t, y1, y2);
+            };
+        }
+        var detEase = detKubikBezier(0, 0, 0.58, 1); // CSS "ease-out" ile AYNI sekil
+
+        function detCanvasOlustur() {
+            var dpr = Math.min(window.devicePixelRatio || 1, 2);
+            var c = document.createElement("canvas");
+            c.setAttribute("aria-hidden", "true");
+            c.style.position = "fixed";
+            c.style.left = "0";
+            c.style.top = "0";
+            c.style.width = "100vw";
+            c.style.height = "100vh";
+            c.style.pointerEvents = "none";
+            c.style.zIndex = "1000";
+            c.width = Math.max(1, Math.round(window.innerWidth * dpr));
+            c.height = Math.max(1, Math.round(window.innerHeight * dpr));
+            document.body.appendChild(c);
+            var ctx = c.getContext("2d");
+            ctx.scale(dpr, dpr);
+            return c;
+        }
+
+        // detGeciciOlustur: detCanvasOlustur ile AYNI dpr/olcek kuralini
+        // izleyen ama DOM'a HIC eklenmeyen (procedural gecicTuval gibi, SADECE
+        // offscreen composite icin) bir yardimci tuval.
+        function detGeciciOlustur() {
+            var dpr = Math.min(window.devicePixelRatio || 1, 2);
+            var c = document.createElement("canvas");
+            c.width = Math.max(1, Math.round(window.innerWidth * dpr));
+            c.height = Math.max(1, Math.round(window.innerHeight * dpr));
+            var ctx = c.getContext("2d");
+            ctx.scale(dpr, dpr);
+            return c;
+        }
+
+        function detYerelNokta(merkez, u, v) {
+            return {
+                x: merkez.x + detDirX * u + detPerpX * v,
+                y: merkez.y + detDirY * u + detPerpY * v
+            };
+        }
+
+        // detGeometriUret: EXPLICIT tip-first insa (istek #5) - "center +
+        // guessed extended radius = tip" YERINE, ONCE tipWorld verilir, govde
+        // merkezi GERIYE DOGRU (boyunUzunluk + kaide-payi kadar) turetilir.
+        // Boylece govde/omuz asla tipin ONUNE gecemez (istek #6).
+        function detGeometriUret(tipWorld, boyunUzunluk, govdeYariGenislik, boyunKaideYariGenislik, ucYariGenislik) {
+            var kaidePay = govdeYariGenislik * DET_GOVDE_KAIDE_PAY_ORANI;
+            var merkez = {
+                x: tipWorld.x - detDirX * (boyunUzunluk + kaidePay),
+                y: tipWorld.y - detDirY * (boyunUzunluk + kaidePay)
+            };
+            return {
+                merkez: merkez,
+                govdeYariGenislik: govdeYariGenislik,
+                kaideU: kaidePay,
+                boyunKaideYariGenislik: boyunKaideYariGenislik,
+                ucU: kaidePay + boyunUzunluk,
+                ucYariGenislik: ucYariGenislik
+            };
+        }
+
+        // detTitreme: KUCUK, zamanla dalgalanan bir sapma dondurur - genlik
+        // "taban" (o kaynagin KENDI yaricapi) bir orani olarak turetilir,
+        // boylece govde genisken buyuk, uc incelmisken kucuk mutlak sapma
+        // uretir. "tuz" (farkli sabit her kaynak icin) kaynaklarin BIRBIRINDEN
+        // BAGIMSIZ/farkli fazda dalgalanmasini saglar. TANI (kullanici geri
+        // bildirimi, "kararsiz olsun, direkt geliyor") - TEK bir sinus cok
+        // DUZENLI/mekanik gorunuyordu ("direkt" hissi); IKI FARKLI frekans/
+        // fazdaki sinusun (birbirine tam-sayi orantili OLMAYAN 1.7 katsayisi
+        // ile) toplami, gercek periyodik OLMAYAN, cok daha organik/ongorulemez
+        // bir titreklik uretir - gercek Perlin/simplex gurultusu YOK (asiri
+        // muhendislik), ama AYNI etkiyi ucuza taklit eder.
+        function detTitreme(zamanMs, taban, tuz) {
+            var s1 = Math.sin(zamanMs * DET_TITREME_HIZI + tuz);
+            var s2 = Math.sin(zamanMs * DET_TITREME_HIZI * 1.7 + tuz * 2.3 + 1.1);
+            return (s1 * 0.7 + s2 * 0.3) * taban * DET_TITREME_GENISLIK_ORANI;
+        }
+
+        // detSalinim: detTitreme'nin AKSINE, HER kaynak icin AYRI/bagimsiz
+        // FAZ degil - TEK, PAYLASILAN, yavas bir sinus dondurur (bkz. yukarida
+        // DET_SALINIM_* yorumu, TANI). detAlanKaynaklariUret'te BUTUN
+        // kaynaklara AYNI ANDA eklenerek TUM govde/boyunun BIR ARADA saga-sola
+        // sallanmasini (kirbac benzeri) saglar - genlik CARI govdeYariGenislik'e
+        // GORE (SABIT detHandoffYaricap'a DEGIL - govde/uc emilimde kuculdukce
+        // sallanti da ORANTILI kuculur, koprulenme garantisi HER ZAMAN korunur,
+        // bkz. yukarida TANI).
+        function detSalinim(zamanMs, govdeYariGenislik) {
+            return Math.sin(zamanMs * DET_SALINIM_HIZI) * govdeYariGenislik * DET_SALINIM_GENISLIK_ORANI;
+        }
+
+        // detYaricapAt: g'nin (govde/boyun-kaidesi/uc) tanimladigi genislik
+        // profilini, verilen HERHANGI bir u'da (0..ucU) degerlendirir - hem
+        // detAlanKaynaklariUret'in adaptif adimlama dongusunde HEM DE
+        // uretilen her kaynagin KENDI yaricabini hesaplarken kullanilir (TEK
+        // dogruluk kaynagi, iki kez yazilmis kopya formul YOK).
+        function detYaricapAt(g, u) {
+            if (u <= g.kaideU) {
+                var t1 = g.kaideU > 0 ? u / g.kaideU : 1;
+                return g.govdeYariGenislik + (g.boyunKaideYariGenislik - g.govdeYariGenislik) * detSmoothstep(t1);
+            }
+            // TANI (kullanici geri bildirimi, dorduncu tur - "ucun yuzde
+            // 20'si ipince olsun sonra buyusun") - ONCEKI surumde bu segment
+            // (boyunKaide->uc) TEK bir ease-in egrisiyle (t2^KUVVET) BASTAN
+            // SONA surekli inceliyordu - kullanici bunu YETERSIZ buldu; asil
+            // istedigi: govdeye YAKIN buyuk kisim (segmentin ilk
+            // DET_UC_INCELME_BASLANGIC_T'si, ör. %80) NEREDEYSE SABIT/kalin
+            // ("buyusun") kalsin, SADECE UCA EN YAKIN kisim (son %20) HIZLA
+            // ipince bir noktaya cöksün - inceligin TAMAMI, uzunlugun kucuk
+            // bir kismina SIKISTIRILIR. Govde/omuz tarafi (t1, yukarida) YINE
+            // smoothstep/yuvarlak kalir, SADECE bu son bolum degisir.
+            var boyunPay = g.ucU - g.kaideU;
+            var t2 = boyunPay > 0 ? (u - g.kaideU) / boyunPay : 1;
+            if (t2 <= DET_UC_INCELME_BASLANGIC_T) {
+                return g.boyunKaideYariGenislik;
+            }
+            var t2i = DET_UC_INCELME_BASLANGIC_T < 1 ? (t2 - DET_UC_INCELME_BASLANGIC_T) / (1 - DET_UC_INCELME_BASLANGIC_T) : 1;
+            var t2ie = Math.pow(t2i, DET_UC_EASE_KUVVETI);
+            return g.boyunKaideYariGenislik + (g.ucYariGenislik - g.boyunKaideYariGenislik) * t2ie;
+        }
+
+        // detAlanKaynaklariUret: g (detGeometriUret'in ciktisi) tarafindan
+        // tanimlanan genislik profilini, govdeden (u=0) uca (u=ucU) DOGRU
+        // dizilmis dairesel metaball kaynaklarina (u, v, r) donusturur.
+        // TANI (kullanici geri bildirimi, ucuncu tur - "cidden bi ince yap"):
+        // ONCEKI surumde TEK bir global "en kucuk yaricap" HER YERDE ayni
+        // (esit) araligi zorluyordu - uc COK incelince (ör. 0.02) bu, TUM
+        // govde/boyun boyunca (kalin govde dahil) ayni asiri-sik araligi
+        // gerektirip DET_ALAN_KAYNAK_SAYISI tavanini govde tarafinda
+        // (gereksiz yere) tuketiyor, tam da yogunluga en cok ihtiyac duyulan
+        // ince uc boglesinde YETERSIZ kaliyordu (koprulenme garantisi
+        // bozuluyordu). Simdi ADAPTIF ADIMLAMA: u=0'dan baslanir, HER adimda
+        // O ANKI (yerel) yaricapa gore (detYaricapAt) bir sonraki adim boyu
+        // belirlenir (kalin govdede BUYUK adimlar/az nokta, ince uca
+        // yaklasirken KUCUK adimlar/cok nokta) - boylece kaynak yogunlugu
+        // TAM ihtiyac duyulan yerde (nerede ince orada sik) birikir, sabit
+        // toplam kaynak sayisi govde tarafinda ISRAF edilmez. Son adim HER
+        // ZAMAN tam u=ucU'ya (temas noktasina) varir - kesinlik BOZULMAZ.
+        function detAlanKaynaklariUret(g, zamanMs, ekstraKaymaV) {
+            ekstraKaymaV = ekstraKaymaV || 0;
+            var noktalar = [0];
+            var u = 0;
+            var guard = 0;
+            while (u < g.ucU && guard < DET_ALAN_KAYNAK_SAYISI - 1) {
+                // Sadece BASLANGIC noktasinin yaricapina gore adim atmak,
+                // yaricap adim ICINDE HIZLA (ör. sivri ucun hemen oncesinde)
+                // dusuyorsa araligi OLDUGUNDAN AZ tahmin edip koprulenmeyi
+                // riske atar - once bu yaricapla bir DENEME adimi atilir,
+                // VARDIGI noktanin yaricabi da olculur, ikisinin KUCUGU
+                // (rMin) ile adim YENIDEN (daha guvenli, kucuk) hesaplanir.
+                // TANI (sayisal dogrulama, "cidden ince yap" turu): adim
+                // tabani ONCEDEN sabit "1" idi (MUTLAK piksel) - govde/uc
+                // kucuk olcekli/cok ince oldugunda (ör. yaricap <2.5px) bu,
+                // GERCEK yerel yaricaptan BUYUK kalip adaptif mantigi
+                // GECERSIZ kiliyor, koprulenmeyi bozuyordu. Taban artik
+                // ucU'nun KENDI olcegine gore (SIFIRA bolme/sonsuz donguyu
+                // ONLEMEK icin sadece) COK KUCUK bir epsilon.
+                var adimTabani = Math.max(1e-4, g.ucU * 1e-4);
+                var rBurada = detYaricapAt(g, u);
+                var adimTahmini = Math.max(adimTabani, rBurada * DET_ALAN_KAYNAK_ARALIK_ORANI);
+                var uTahmini = Math.min(g.ucU, u + adimTahmini);
+                var rSonra = detYaricapAt(g, uTahmini);
+                var rMin = Math.min(rBurada, rSonra);
+                var adim = Math.max(adimTabani, rMin * DET_ALAN_KAYNAK_ARALIK_ORANI);
+                u = Math.min(g.ucU, u + adim);
+                noktalar.push(u);
+                guard++;
+            }
+            if (noktalar[noktalar.length - 1] < g.ucU) {
+                noktalar.push(g.ucU);
+            }
+            if (noktalar.length < DET_ALAN_MIN_KAYNAK_SAYISI) {
+                noktalar = [];
+                for (var mi = 0; mi < DET_ALAN_MIN_KAYNAK_SAYISI; mi++) {
+                    noktalar.push((mi / (DET_ALAN_MIN_KAYNAK_SAYISI - 1)) * g.ucU);
+                }
+            }
+
+            var kaynaklar = [];
+            for (var i = 0; i < noktalar.length; i++) {
+                var uu = noktalar[i];
+                var r = detYaricapAt(g, uu);
+                // Titremeyi/salinimi ucA yaklastikca sondur (DET_TITREME_
+                // SAKINLESME_BASLANGIC_ORANI, TANI) - govde/orta-boyun
+                // kararsiz/enerjik kalirken tam uc sakin/duz durur (sivri ucun
+                // netligi BOZULMAZ), TAM uctaki kaynak (u===ucU) HER ZAMAN
+                // v=0'da kalir (temas noktasi kesinligi KORUNUR). detSalinim
+                // (TEK, paylasilan faz - TUM kaynaklarda AYNI) detTitreme'nin
+                // (her kaynak KENDI/bagimsiz fazinda) UZERINE eklenir - biri
+                // yerel mikro-titreklik, digeri govdenin BIR ARADA saga-sola
+                // calkalanmasi (istek: "giderken oynasin, calkalansin").
+                var sakinlikT = g.ucU > 0 ? uu / g.ucU : 1;
+                var sakinlik = 1 - detPencere(sakinlikT, DET_TITREME_SAKINLESME_BASLANGIC_ORANI, 1.0);
+                var v = (detTitreme(zamanMs, r, i * 1.9 + 0.6) + detSalinim(zamanMs, g.govdeYariGenislik) + ekstraKaymaV) * sakinlik;
+                kaynaklar.push({ u: uu, v: v, r: r });
+            }
+            return kaynaklar;
+        }
+
+        // detAlanKutusu: kaynaklarin (u,v) bounding-box'i, en buyuk yaricapa
+        // oranli bir kenar payiyla (DET_ALAN_PAY_ORANI - blur/hale icin yer)
+        // buyutulmus. detAlanDegerlendir'in orneklemesi VE detPasoCiz'in
+        // hedef dikdortgeni BUNUN UZERINDEN turetilir.
+        function detAlanKutusu(kaynaklar) {
+            var uMin = Infinity, uMax = -Infinity, vMax = 0;
+            for (var i = 0; i < kaynaklar.length; i++) {
+                var k = kaynaklar[i];
+                uMin = Math.min(uMin, k.u - k.r);
+                uMax = Math.max(uMax, k.u + k.r);
+                vMax = Math.max(vMax, Math.abs(k.v) + k.r);
+            }
+            var pay = vMax * DET_ALAN_PAY_ORANI;
+            return { uMin: uMin - pay, uMax: uMax + pay, vMin: -vMax - pay, vMax: vMax + pay };
+        }
+
+        // detAlanDegerlendir: alanDegerlendir (yukarida, ana prosedurel motor)
+        // ile MATEMATIKSEL OLARAK AYNI teknik - r^2/(d^2+1) alanlarinin toplami,
+        // smoothstep esikle alfaya cevrilir - ama tumParcaciklar/alanW/alanH
+        // YERINE kaynaklar/kutu (detAlanKaynaklariUret/detAlanKutusu) uzerinde,
+        // TAMAMEN BAGIMSIZ calisir. Cikti detAlanKucukTuval'e (kucukTuval'in
+        // KENDI karsiligi) yazilir.
+        function detAlanDegerlendir(kaynaklar, kutu) {
+            var veri = detAlanVerisi.data;
+            var idx = 0;
+            var bw = kutu.uMax - kutu.uMin;
+            var bh = kutu.vMax - kutu.vMin;
+            for (var gy = 0; gy < DET_ALAN_GRID_V; gy++) {
+                var pv = kutu.vMin + (gy + 0.5) / DET_ALAN_GRID_V * bh;
+                for (var gx = 0; gx < DET_ALAN_GRID_U; gx++) {
+                    var pu = kutu.uMin + (gx + 0.5) / DET_ALAN_GRID_U * bw;
+                    var toplam = 0;
+                    for (var n = 0; n < kaynaklar.length; n++) {
+                        var k = kaynaklar[n];
+                        var du = pu - k.u;
+                        var dv = pv - k.v;
+                        toplam += (k.r * k.r) / (du * du + dv * dv + 1);
+                    }
+                    var t = (toplam - (DET_ALAN_ESIK - DET_ALAN_ESIK_YUMUSAKLIGI)) / (2 * DET_ALAN_ESIK_YUMUSAKLIGI);
+                    t = t < 0 ? 0 : (t > 1 ? 1 : t);
+                    var alfa = t * t * (3 - 2 * t);
+
+                    veri[idx] = 255;
+                    veri[idx + 1] = 255;
+                    veri[idx + 2] = 255;
+                    veri[idx + 3] = Math.round(alfa * 255);
+                    idx += 4;
+                }
+            }
+            detAlanKucukBaglam.putImageData(detAlanVerisi, 0, 0);
+        }
+
+        // detPasoCiz: pasoCiz'in (yukarida, ana prosedurel motor) KENDI
+        // teknigini birebir yansitir - dusuk-cozunurluklu maskeyi (buyume/blur
+        // ile) gecici tam-ekran tuvale ciz, gradyani "source-in" ile o
+        // maskenin icinden gecir, sonra ana detCtx'e (KENDI globalAlpha'siyla)
+        // bindir. detCizimYap bunu iki kez cagirir: once buyutulmus+bulanik+
+        // dusuk-alfa "hale" pasi, sonra buyume/blur olmadan keskin pas -
+        // pasoCiz(buyume,bulanik,alfa,gradyan)'in AYNI cift-pasli deseni.
+        function detPasoCiz(g, kutu, buyumePx, bulanikPx, alfa, gradyan) {
+            if (alfa <= 0) { return; }
+
+            detGeciciCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+            detGeciciCtx.save();
+            if (bulanikPx > 0) {
+                detGeciciCtx.filter = "blur(" + bulanikPx + "px)";
+            }
+            detGeciciCtx.translate(g.merkez.x, g.merkez.y);
+            detGeciciCtx.rotate(detAci);
+            var bw = kutu.uMax - kutu.uMin;
+            var bh = kutu.vMax - kutu.vMin;
+            detGeciciCtx.drawImage(detAlanKucukTuval, 0, 0, DET_ALAN_GRID_U, DET_ALAN_GRID_V,
+                kutu.uMin - buyumePx / 2, kutu.vMin - buyumePx / 2, bw + buyumePx, bh + buyumePx);
+            detGeciciCtx.restore();
+
+            detGeciciCtx.save();
+            detGeciciCtx.globalCompositeOperation = "source-in";
+            detGeciciCtx.fillStyle = gradyan;
+            detGeciciCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+            detGeciciCtx.restore();
+
+            detCtx.save();
+            detCtx.globalAlpha = alfa;
+            detCtx.drawImage(detGeciciTuval, 0, 0, window.innerWidth, window.innerHeight);
+            detCtx.restore();
+        }
+
+        // detCizimYap: viewport'u temizler, g'den (varsa) metaball
+        // kaynaklarini/kutusunu/maskesini uretir (detAlanKaynaklariUret/
+        // detAlanKutusu/detAlanDegerlendir) ve #parlama ile AYNI --parlama-
+        // 1/2/3 CSS degiskenlerinden (istek #7 - tema-duyarli, kabul edilmis
+        // SICAK/SOGUK renk ailesi) turetilmis 3 RENKLI (gradyanOlustur ile
+        // BIREBIR AYNI sıra/durak) bir gradyanla, prosedurel pasoCiz'in KENDI
+        // iki-pasli (buyutulmus+bulanik+dusuk-alfa "hale", SONRA keskin/tam-
+        // alfa) tekniginde (bkz. detPasoCiz) boyar.
+        function detCizimYap(g, alfa, zamanMs, ekstraKaymaV) {
+            detCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+            if (!g || alfa <= 0) { return; }
+
+            var kaynaklar = detAlanKaynaklariUret(g, zamanMs, ekstraKaymaV);
+            var kutu = detAlanKutusu(kaynaklar);
+            detAlanDegerlendir(kaynaklar, kutu);
+
+            var ucNoktasi = detYerelNokta(g.merkez, g.ucU, 0);
+            var arkaNoktasi = detYerelNokta(g.merkez, -g.govdeYariGenislik * DET_GOVDE_ARKA_KATSAYI, 0);
+            var gradyan = detCtx.createLinearGradient(arkaNoktasi.x, arkaNoktasi.y, ucNoktasi.x, ucNoktasi.y);
+            gradyan.addColorStop(0, detGovdeRenk1);
+            gradyan.addColorStop(0.55, detGovdeRenkOrta);
+            gradyan.addColorStop(1, detGovdeRenk2);
+
+            var haleBuyumePx = Math.max(1, detHandoffYaricap * DET_HALE_BUYUME_ORANI);
+            var haleBulanikPx = Math.max(1, detHandoffYaricap * DET_HALE_BULANIKLIK_ORANI);
+            detPasoCiz(g, kutu, haleBuyumePx, haleBulanikPx, alfa * DET_HALE_ALFA, gradyan);
+            detPasoCiz(g, kutu, 0, 0, alfa, gradyan);
+        }
+
+        // detMorphCiz: m=0..1 - istek #7: govde (me, BUTUN m boyunca) hafifce
+        // kuculurken, omuz/boyun/uc AYNI "me" ile DEGIL, HER BIRI KENDI ayri
+        // m-penceresinde (detPencere, yukarida DET_*_ASAMA_* sabitleri)
+        // ilerler - ONCE omuz daralir (erken pencere), SONRA boyun uzar
+        // (orta pencere), SONRA uc incelir (gec pencere) - goz bu sirayi
+        // ayirt edebilir, hepsi birden "patlamaz". TIP (istek #5)
+        // tipBaslangic'tan (govdenin handoff anindaki GERCEK on kenari)
+        // MEVCUT/DEGISTIRILMEMIS temas noktasina dogru me ile ilerler. m=1'de
+        // govde/boyun/uc degerleri, emilim fazinin BASLANGIC referansi olarak
+        // saklanir (sicramasiz devir).
+        function detMorphCiz(zamanMs) {
+            var gecen = zamanMs - detMorphBaslangicZamani;
+            var t = gecen / detMorphSuresi;
+            var m = t < 0 ? 0 : (t > 1 ? 1 : t);
+            // mSonrasi: TANI (yukarida DET_ANTICIPASYON_* yorumu) - m'nin ILK
+            // DET_ANTICIPASYON_ORANI'si boyunca 0'da SABIT kalir (govde/boyun/
+            // uc/tip HENUZ degismez - sadece asagidaki ekstraKaymaV ile bir
+            // kerelik yanal "cil" olur), SONRA (m > ORANI) KALAN sureye
+            // yayilarak 0'dan 1'e smoothstep ile ilerler - asil donusum BUNUN
+            // UZERINDEN (me/omuzE/ucE, HEPSI) devam eder.
+            var mSonrasi = detPencere(m, DET_ANTICIPASYON_ORANI, 1.0);
+            var me = detSmoothstep(mSonrasi);
+            var omuzE = detPencere(mSonrasi, DET_OMUZ_ASAMA_BASLANGIC, DET_OMUZ_ASAMA_BITIS);
+            var ucE = detPencere(mSonrasi, DET_UC_ASAMA_BASLANGIC, DET_UC_ASAMA_BITIS);
+
+            var govdeYariGenislik = detHandoffYaricap * (DET_GOVDE_YARIGENISLIK_BASLANGIC + (DET_GOVDE_YARIGENISLIK_BITIS - DET_GOVDE_YARIGENISLIK_BASLANGIC) * me);
+            // boyunUzunluk artik SABIT DEGIL - CARI govdeYariGenislik'e
+            // ORANLI (TANI, yukarida) - govde kuculdukce kuyruk da ORANTILI
+            // kisalir, govde:kuyruk gorunumu m boyunca TUTARLI kalir.
+            var boyunUzunluk = govdeYariGenislik * DET_BOYUN_UZUNLUK_GOVDE_ORANI;
+            var kaideOrani = DET_BOYUN_KAIDE_ORANI_BASLANGIC + (DET_BOYUN_KAIDE_ORANI_BITIS - DET_BOYUN_KAIDE_ORANI_BASLANGIC) * omuzE;
+            var boyunKaideYariGenislik = govdeYariGenislik * kaideOrani;
+            var ucYariGenislik = detHandoffYaricap * (DET_UC_YARIGENISLIK_BASLANGIC + (DET_UC_YARIGENISLIK_BITIS - DET_UC_YARIGENISLIK_BASLANGIC) * ucE);
+
+            var tipWorld = {
+                x: detTipBaslangic.x + (detTemasWorld.x - detTipBaslangic.x) * me,
+                y: detTipBaslangic.y + (detTemasWorld.y - detTipBaslangic.y) * me
+            };
+
+            var g = detGeometriUret(tipWorld, boyunUzunluk, govdeYariGenislik, boyunKaideYariGenislik, ucYariGenislik);
+
+            // ekstraKaymaV: IKI asamali hazirlik penceresi (TANI, yukarida).
+            // "cil" suresi = ORANI*CIL_ORANI - SADECE bu kisa ilk dilimde
+            // yari-sinus bir tumsek (m=0'da ve cil bitiminde SIFIR, ortasinda
+            // tepe). Cil bitince (m > cilSuresi) DET_ANTICIPASYON_ORANI'ya
+            // kadar ekstraKaymaV TAM SIFIR - govde/boyun/uc zaten SABIT (me
+            // hala 0), goz belirgin bir DURGUNLUK anini gorur.
+            var ekstraKaymaV = 0;
+            var cilSuresi = DET_ANTICIPASYON_ORANI * DET_ANTICIPASYON_CIL_ORANI;
+            if (m < cilSuresi) {
+                var anticipasyonBiciimi = Math.sin(Math.PI * m / cilSuresi);
+                ekstraKaymaV = -anticipasyonBiciimi * detHandoffYaricap * DET_ANTICIPASYON_GENISLIK_ORANI;
+            }
+
+            var crossfadeT = gecen / DET_GECIS_SURESI;
+            var alfa = crossfadeT < 0 ? 0 : (crossfadeT > 1 ? 1 : crossfadeT);
+            detCizimYap(g, alfa, zamanMs, ekstraKaymaV);
+
+            if (m >= 1) {
+                detGovdeYariGenislikM1 = govdeYariGenislik;
+                detUcYariGenislikM1 = ucYariGenislik;
+            }
+        }
+
+        // detEmilimCiz: p=0..1 - TIP HER ZAMAN detTemasWorld'de SABIT kalir
+        // (yeniden hesaplanmaz - istek #9). Boyun uzunlugu 0'a iner (kaide
+        // UCA dogru ilerler - "boyun ARKADAN kisalir"), govde/uc genisligi
+        // AYNI hizda (govde tabani 0.10, uc tabani 0.22 - istek #9, boyun
+        // giderken govde bir TOP gibi kalmasin) kucuk bir kalintiya kadar
+        // YUMUSAK azalir. Son ~%4'te (DET_EMILIM_OPAKLIK_BASLANGIC_ORANI,
+        // istek #10 - onceki ~%7'den KISALTILDI) kalan GERCEKTEN kucuk
+        // kalinti SADECE opaklikla temizlenir - birincil mekanizma HER ZAMAN
+        // geometri, opaklik degil.
+        function detEmilimCiz(zamanMs) {
+            var gecen = zamanMs - detEmilimBaslangicZamani;
+            var t = gecen / fillSuresi;
+            var pHam = t < 0 ? 0 : (t > 1 ? 1 : t);
+            var p = detEase(pHam);
+
+            var govdeYariGenislik = detGovdeYariGenislikM1 * (1 - (1 - DET_EMILIM_GOVDE_TABAN_ORANI) * p);
+            // boyunUzunluk: morph ile AYNI govde-oranli ilke (TANI, yukarida)
+            // - govde kuculdukce kuyruk ORANTILI kisalir - AMA emilimde ayrica
+            // (1-p) ile carpilir, boylece p=1'de (tam emilim) tam SIFIRA iner
+            // ("boyun ARKADAN kisalir" - istek #9 - HALA gecerli).
+            var boyunUzunluk = govdeYariGenislik * DET_BOYUN_UZUNLUK_GOVDE_ORANI * (1 - p);
+            var boyunKaideYariGenislik = govdeYariGenislik * DET_BOYUN_KAIDE_ORANI_BITIS;
+            var ucYariGenislik = detUcYariGenislikM1 * (1 - (1 - DET_EMILIM_UC_TABAN_ORANI) * p);
+
+            var g = detGeometriUret(detTemasWorld, boyunUzunluk, govdeYariGenislik, boyunKaideYariGenislik, ucYariGenislik);
+
+            var alfa = 1;
+            if (pHam > DET_EMILIM_OPAKLIK_BASLANGIC_ORANI) {
+                alfa = 1 - (pHam - DET_EMILIM_OPAKLIK_BASLANGIC_ORANI) / (1 - DET_EMILIM_OPAKLIK_BASLANGIC_ORANI);
+            }
+            detCizimYap(g, alfa, zamanMs);
+
+            if (pHam >= 1) {
+                detTemizle();
+            }
+        }
+
+        function detDongu(zamanMs) {
+            if (detFaz === "morph") {
+                detMorphCiz(zamanMs);
+            } else if (detFaz === "emilim") {
+                detEmilimCiz(zamanMs);
+            }
+            if (detFaz !== "bitti") {
+                detRafId = requestAnimationFrame(detDongu);
+            }
+        }
+
+        // detTemizle: gecici canvas'i kaldirir, rAF dongusunu durdurur - hicbir
+        // requestAnimationFrame/DOM dugumu SIZDIRILMAZ (istek #13). #parlama
+        // zaten .parlama-gizli SINIFIYLA (asagida detMorphBaslat) KALICI
+        // olarak gizlenmis durumda - buradan AYRICA dokunulmaz.
+        function detTemizle() {
+            detFaz = "bitti";
+            if (detRafId !== null) {
+                cancelAnimationFrame(detRafId);
+                detRafId = null;
+            }
+            if (detCanvas && detCanvas.parentNode) {
+                detCanvas.parentNode.removeChild(detCanvas);
+            }
+            detCanvas = null;
+            detCtx = null;
+            detGeciciTuval = null;
+            detGeciciCtx = null;
+        }
+
+        // detMorphBaslat: PROSEDUREL #parlama'dan DETERMINISTIK canvas'a el
+        // degistirme (istek #1). MEVCUT gorunen (WAAPI ile canli guncellenen)
+        // #parlama kutusu getBoundingClientRect() ile OKUNUR - govdenin
+        // konumu/boyutu TAHMIN edilmez, olcum edilir. seyahatAnim ONCE
+        // pause()+commitStyles() ile MEVCUT karesine SABITLENIR (boylece
+        // cancel() cagrildiginda BASA SICRAMAZ), sonra cancel() edilip TEK
+        // basina, cakismayan YENI bir opaklik-fade ile kisa surede (istek #6 -
+        // 80-120ms) sondurulur - boylece #parlama, canvas govdeyi
+        // devraldiktan sonra ASLA altta gorunur sekilde YARISMAZ.
+        function detMorphBaslat() {
+            var r = parlama.getBoundingClientRect();
+            var handoffMerkez = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+            var handoffOlcek = r.width / 300; // #parlama'nin TRANSFORM-ONCESI genisligi HER ZAMAN 300px
+            detHandoffYaricap = govdeYaricapi(handoffOlcek);
+            detTipBaslangic = {
+                x: handoffMerkez.x + detDirX * detHandoffYaricap,
+                y: handoffMerkez.y + detDirY * detHandoffYaricap
+            };
+
+            // 3 renk de gradyanOlustur() ile AYNI kaynaktan (--parlama-1/2/3)
+            // ve AYNI sırayla okunur - istek: govde artik 2 renkli DUZ bir
+            // dolgu degil, prosedurel govdeyle BIREBIR AYNI 3 renkli gecis.
+            var stil = getComputedStyle(parlama);
+            detGovdeRenk1 = stil.getPropertyValue("--parlama-1").trim();
+            detGovdeRenkOrta = stil.getPropertyValue("--parlama-2").trim();
+            detGovdeRenk2 = stil.getPropertyValue("--parlama-3").trim();
+
+            detCanvas = detCanvasOlustur();
+            detCtx = detCanvas.getContext("2d");
+            detGeciciTuval = detGeciciOlustur();
+            detGeciciCtx = detGeciciTuval.getContext("2d");
+
+            if (seyahatAnim.pause) { seyahatAnim.pause(); }
+            try {
+                if (seyahatAnim.commitStyles) { seyahatAnim.commitStyles(); }
+            } catch (e) {
+                // guvenlik agi: commitStyles bazi kenar durumlarda (ör. eleman
+                // gecici olarak render-disi) istisna atabilir - yoksayilir,
+                // asagidaki cancel() + yeni opaklik animasyonu yine de calisir.
+            }
+            seyahatAnim.cancel();
+            if (parlama.animate) {
+                parlama.animate(
+                    [{ opacity: 1 }, { opacity: 0 }],
+                    { duration: DET_GECIS_SURESI, easing: "linear", fill: "forwards" }
+                );
+            } else {
+                parlama.style.opacity = "0";
+            }
+            setTimeout(function () {
+                parlama.classList.add("parlama-gizli");
+            }, DET_GECIS_SURESI);
+
+            detMorphBaslangicZamani = performance.now();
+            detMorphSuresi = Math.max(1, seyahatSure - Math.round(seyahatSure * DET_MORPH_BASLANGIC_ORANI));
+            detFaz = "morph";
+            detRafId = requestAnimationFrame(detDongu);
+        }
+
+        // detEmilimBaslat: TAM temas aninda (asagidaki, DEGISMEMIS
+        // setTimeout(...,seyahatSure) icinden) cagrilir - AYNI KARE, AYNI
+        // "p" mantigiyla suction+perimeter'i baslatan tek nokta (istek #8/#10).
+        function detEmilimBaslat() {
+            detEmilimBaslangicZamani = performance.now();
+            detFaz = "emilim";
+            if (detRafId === null) {
+                detRafId = requestAnimationFrame(detDongu);
+            }
+        }
+
         // Seyahat + temas + emilim TEK bir WAAPI animasyonunda oynar
         // (fill:"forwards" son kareyi - opacity 0, temas noktasina gomulu
         // govde - kalici tutar). toplamSure aninda Şey'in animasyonu biter;
         // asagidaki cevre-akisi/hale/rezerv-sonumu de AYNI ana (seyahatSure)
         // baslar ve AYNI sureyi (fillSuresi) paylasir - bu YUZDEN emilim ve
-        // cevre-guc-yayilimi birlikte ilerler ve birlikte tamamlanir.
+        // cevre-guc-yayilimi birlikte ilerler ve birlikte tamamlanir. SADECE
+        // seyahatin ilk DET_MORPH_BASLANGIC_ORANI'si boyunca GORUNUR kalir -
+        // detMorphBaslat (asagida, ayri bir setTimeout ile) devraldiktan sonra
+        // pause/commitStyles/cancel edilir (yukarida) - kareler/emilimKaresi/
+        // seyahatMerkezi'nin KENDISI hicbir sekilde degismedi.
         // Gercek POST navigasyonu (form submit zaten engellenmiyor) sayfayi
         // normal sekilde degistirecek; burada yapay bir gecikme eklenmedi.
-        parlama.animate(kareler, {
+        var seyahatAnim = parlama.animate(kareler, {
             duration: toplamSure,
             easing: "cubic-bezier(0.33, 0, 0.2, 1)",
             fill: "forwards"
@@ -1958,6 +2658,12 @@
             window.__parlamaManyetikBaslat(-yonX, -yonY, seyahatSure);
         }
 
+        // Deterministik son-yaklasim el degistirmesi (istek #1) - seyahatin
+        // DET_MORPH_BASLANGIC_ORANI'sinda (yukarida tanimli sabit) tetiklenir.
+        // Bagimsiz bir zamanlayici - asagidaki temas setTimeout'unu (seyahatSure)
+        // HICBIR SEKILDE degistirmez/geciktirmez.
+        setTimeout(detMorphBaslat, Math.round(seyahatSure * DET_MORPH_BASLANGIC_ORANI));
+
         // fillSuresi zaten yukarida (collapseSure'un da paylastigi deger
         // olarak) tanimlandi - burada YENIDEN bildirilmiyor.
         //
@@ -1975,6 +2681,13 @@
             if (window.__parlamaManyetikBitir) {
                 window.__parlamaManyetikBitir();
             }
+
+            // Deterministik emilim (istek #8/#9/#10) TAM BU KAREDE baslar -
+            // cevreAkisiCalistir (asagida, birkaç satir sonra, AYNI senkron
+            // cagri yigininda) ile TAM AYNI ani paylasir; ikisi de fillSuresi
+            // kullanir - "ayni baslangic/ayni sure" boylece INSA GEREGI
+            // saglanir (bkz. yukarida detEmilimBaslat/detEase).
+            detEmilimBaslat();
 
             // Griyi tasiyan zemin (.yaziyor-arkaplan) + --yuzey-1/2 renk
             // degiskenlerini acan .sonraki-hale sinifi BURADA, akis
@@ -2526,10 +3239,6 @@
         soruBalonu.innerHTML = '<div class="alert mb-0 chat-balon balon-soru" style="max-width:70%;"></div>';
         soruBalonu.querySelector("div").textContent = soruMetni;
         kutu.appendChild(soruBalonu);
-
-        setTimeout(function () {
-            document.getElementById("Soru").value = "";
-        }, 0);
 
         var yaziyorSatiri = document.createElement("div");
         // "sonraki-hale" satira da eklenir: #mesajKutusu (overflow-y:auto) her
