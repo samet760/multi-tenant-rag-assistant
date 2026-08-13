@@ -8,6 +8,8 @@ namespace arayuz.Pages;
 [Microsoft.AspNetCore.Authorization.Authorize]
 public class IndexModel : PageModel
 {
+    public const int SoruMaksUzunluk = 4000;
+
     [BindProperty]
     public string Soru { get; set; } = "";
 
@@ -15,6 +17,8 @@ public class IndexModel : PageModel
     public long? SohbetId { get; set; }
 
     public string Cevap { get; set; } = "";
+
+    public string? Hata { get; set; }
 
     public record Mesaj(string Rol, string Metin, double? Skor);
     public List<Mesaj> Mesajlar { get; set; } = new();
@@ -61,13 +65,33 @@ public class IndexModel : PageModel
             return Page();
         }
 
+        if (Soru.Length > SoruMaksUzunluk)
+        {
+            Hata = $"Soru en fazla {SoruMaksUzunluk} karakter olabilir.";
+            return Page();
+        }
+
         var istemci = new HttpClient();
         var tenant = User.FindFirst("tenant_id")!.Value;
         var eposta = User.Identity!.Name;
         var govde = new { soru = Soru, tenant_id = tenant };
-        var yanit = await istemci.PostAsJsonAsync("http://127.0.0.1:8000/sor", govde);
-        var sonuc = await yanit.Content.ReadFromJsonAsync<SorguYaniti>();
-        Cevap = sonuc?.cevap ?? "";
+
+        SorguYaniti? sonuc = null;
+        try
+        {
+            var yanit = await istemci.PostAsJsonAsync("http://127.0.0.1:8000/sor", govde);
+            sonuc = await yanit.Content.ReadFromJsonAsync<SorguYaniti>();
+            Cevap = sonuc?.cevap ?? "";
+        }
+        catch (Exception ex) when (ex is TimeoutException ||
+            (ex is TaskCanceledException tce && tce.InnerException is TimeoutException))
+        {
+            // HttpClient'in kendi (varsayilan 100s) suresi doldugunda TaskCanceledException
+            // firlatir ve InnerException TimeoutException olur - bu ikisi DISINDA baska
+            // bir TaskCanceledException (orn. istemci baglantiyi kesti) burada YUTULMAZ,
+            // filtreye takilmadigi icin normal sekilde yukari firlar.
+            Cevap = "İstek zaman aşımına uğradı. Lütfen daha kısa veya daha net bir soru deneyin.";
+        }
 
         using var baglanti = Db.Baglan();
 

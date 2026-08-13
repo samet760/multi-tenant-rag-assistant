@@ -33,6 +33,14 @@
             overflow-y: auto;
         }
 
+        /* SayfaKaydirmasiz sayfalari (bkz. Index.cshtml) icin: sayfa govdesinin
+           KENDISI kaydirilmaz - o sayfanin kendi ic govde-alani (orn.
+           #mesajKutusu) tek kaydirma sahibi olur. Diger sayfalar (Belgeler
+           vb.) .sayfa-govdesi'nin normal overflow-y:auto davranisini korur. */
+        .sayfa-govdesi-sabit {
+            overflow: hidden;
+        }
+
         .sayfa-govdesi > main {
             height: 100%;
         }
@@ -187,8 +195,9 @@
     </header>
     @{
         var tamGenislik = ViewData["TamGenislik"] as bool? == true;
+        var sayfaKaydirmasiz = ViewData["SayfaKaydirmasiz"] as bool? == true;
     }
-    <div class="sayfa-govdesi @(tamGenislik ? "" : "container")">
+    <div class="sayfa-govdesi @(tamGenislik ? "" : "container") @(sayfaKaydirmasiz ? "sayfa-govdesi-sabit" : "")">
         <main role="main" class="pb-3">
             @RenderBody()
         </main>

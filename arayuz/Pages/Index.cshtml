@@ -4,6 +4,7 @@
 @{
     ViewData["Title"] = "Sorgu";
     ViewData["TamGenislik"] = true;
+    ViewData["SayfaKaydirmasiz"] = true;
 }
 
 <style>
@@ -48,6 +49,22 @@
     .soru-formu-girdi {
         border-radius: 999px;
         padding: 0.75rem 1.25rem;
+    }
+
+    /* site.css .form-control:focus mavi/beyaz cift box-shadow ekliyor;
+       Bootstrap'in kendi :focus border-color degisimi de ayri bir renk
+       katiyor. #Soru id secici (class'lardan daha yuksek ozgunluk) her
+       ikisini de gecersiz kilip dinlenme haldeki kenarligi/sekli korur. */
+    #Soru:focus,
+    #Soru:focus-visible {
+        outline: 0;
+        box-shadow: none;
+        border-color: var(--bs-border-color);
+    }
+
+    .soru-formu-girdi.soru-girdi-temizlendi {
+        color: transparent;
+        caret-color: transparent;
     }
 
     .soru-formu-dugme {
@@ -104,10 +121,21 @@
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
+        overflow-x: hidden;
         position: relative;
         z-index: 0;
         scrollbar-width: thin;
         scrollbar-color: var(--bs-secondary-color) transparent;
+    }
+
+    /* Mesaj yokken kaydiracak gercek icerik de yok - #parlama'nin (300px,
+       konumu/boyutu/animasyonu HIC DEGISMEDI) kisa pencerelerde #mesajKutusu'nun
+       gorunur alanindan tasan kismi, boyle bir kaydirma cubugu OLUSTURMADAN
+       (overflow:hidden) sessizce kirpilir. #mesajKutusu.overflow-y:auto'nun
+       KENDISI DEGISMEDI - sadece bu ID+class birlesimi, ID'den daha yuksek
+       ozgunlukle, SADECE bos sohbet durumunda onu gecersiz kilar. */
+    #mesajKutusu.mesaj-kutusu-bos {
+        overflow-y: hidden;
     }
 
     .mesaj-satiri {
@@ -118,12 +146,25 @@
     .balon-soru {
         background-color: var(--bs-secondary-bg);
         color: var(--bs-body-color);
+        /* balon, ".d-flex justify-content-end" satirinin bir flex-item'i - bosluksuz
+           uzun bir metin, varsayilan min-width:auto yuzunden max-width:70%'i yok
+           sayip satiri yatay taşırabiliyordu. min-width:0 bu korumayi kaldirir,
+           overflow-wrap:anywhere kirilacak bosluk olmasa bile metni balonun icinde
+           tutar (kesme/truncate YOK, sadece satir icinde sarilir). */
+        min-width: 0;
+        overflow-wrap: anywhere;
     }
 
     .balon-cevap {
         background-color: var(--bs-tertiary-bg);
         color: var(--bs-body-color);
         border: 1px solid var(--bs-border-color);
+        /* balon-soru ile ayni sebep/cozum: ".d-flex justify-content-start"
+           satirinin bir flex-item'i - min-width:0 + overflow-wrap:anywhere,
+           bosluksuz uzun cevap metninin max-width:70%'i yatay tasirmasini
+           onler, kesme/truncate yapmadan satir icinde sarar. */
+        min-width: 0;
+        overflow-wrap: anywhere;
     }
 
     #selamlama {
@@ -550,14 +591,14 @@
     }
 </style>
 
-<div class="d-flex" style="height:100%;">
+<div class="d-flex" style="height:100%; min-height:0; overflow:hidden;">
     <div class="border-end" style="width:260px;">
         <div class="p-3 h-100">
             @await Component.InvokeAsync("SohbetPaneli")
         </div>
     </div>
-    <div class="flex-grow-1 ps-3 d-flex flex-column" style="min-width:0;">
-        <div id="mesajKutusu" class="mb-4">
+    <div class="flex-grow-1 ps-3 d-flex flex-column" style="min-width:0; min-height:0; overflow:hidden;">
+        <div id="mesajKutusu" class="mb-4 @(Model.Mesajlar.Count == 0 ? "mesaj-kutusu-bos" : "")">
             @if (Model.Mesajlar.Count == 0)
             {
                 <div id="selamlama">
@@ -585,9 +626,14 @@
             }
         </div>
 
-        <form method="post" id="soru-formu" class="d-flex gap-2 mx-auto mb-5 px-3" style="max-width:800px; width:100%;">
+        @if (!string.IsNullOrEmpty(Model.Hata))
+        {
+            <div class="alert alert-danger mx-auto mb-2 px-3" style="max-width:800px; width:100%;" role="alert">@Model.Hata</div>
+        }
+
+        <form method="post" id="soru-formu" class="d-flex gap-2 mx-auto mb-5 px-3" style="max-width:800px; width:100%; flex-shrink:0;">
             <input type="hidden" name="SohbetId" value="@Model.SohbetId" />
-            <input asp-for="Soru" class="form-control soru-formu-girdi flex-grow-1" placeholder="Sorunuzu yazın" required />
+            <input asp-for="Soru" class="form-control soru-formu-girdi flex-grow-1" placeholder="Sorunuzu yazın" autocomplete="off" maxlength="@arayuz.Pages.IndexModel.SoruMaksUzunluk" required />
             <button type="submit" class="btn btn-primary soru-formu-dugme" id="sor-dugmesi">Sor</button>
         </form>
     </div>
@@ -1572,6 +1618,14 @@
             return;
         }
 
+        // ONEMLI: baslangic, asagida absolute->fixed geciste "su an gorunen
+        // konumla BIREBIR ayni noktaya" sabitlemek icin kullanilir (bkz.
+        // asagidaki yorum) - bu yuzden BURADA, kullanilmadan hemen once,
+        // TAZE olculmek ZORUNDA. Daha erken (orn. cagiran kodda, bir
+        // scroll'dan once) olculup buraya tasinirsa, bu satirla o kullanim
+        // arasinda gecen HERHANGI bir layout degisikligi (scroll dahil)
+        // #parlama'yi gercekten gorundugu yerden FARKLI bir noktaya
+        // "dondurur" ve gorunur bir sicramaya/yanlis konuma yol acar.
         var baslangic = parlama.getBoundingClientRect();
         var hedef = hedefBalon.getBoundingClientRect();
 
@@ -3369,19 +3423,43 @@
         };
     }
 
-    document.getElementById("soru-formu").addEventListener("submit", function () {
+    document.getElementById("soru-formu").addEventListener("submit", function (event) {
+        var dugme = document.getElementById("sor-dugmesi");
+
+        // Bir gonderim zaten islemdeyse (dugme.disabled) bu ikinci/ucuncu/...
+        // submit olayini (Enter tekrari, dugmeye art arda tiklama, vb.)
+        // TAMAMEN yok say - ne yeni balon eklenir ne native POST devam eder.
+        // Kilit BURADA, hicbir baska koddan once, senkron olarak kontrol
+        // edilir; bir kere kilitlendikten sonra ayni JS turunda/sonrasinda
+        // gelen her ek submit olayi bunu gorur.
+        if (dugme.disabled) {
+            event.preventDefault();
+            return;
+        }
+
+        dugme.disabled = true;
+        dugme.textContent = "Bekleyin...";
+
         var selamlama = document.getElementById("selamlama");
         var ilkMesajMi = !!selamlama;
         if (selamlama) {
             selamlama.style.display = "none";
         }
 
-        var dugme = document.getElementById("sor-dugmesi");
-        dugme.disabled = true;
-        dugme.textContent = "Bekleyin...";
-
         var kutu = document.getElementById("mesajKutusu");
-        var soruMetni = document.getElementById("Soru").value;
+        // Ilk mesajda #mesajKutusu hala sayfa yuklendiginde (0 mesajken) sunucudan
+        // gelen "mesaj-kutusu-bos" class'ini (overflow-y:hidden) tasiyor - artik
+        // gercek icerik eklenecegi icin bunu hemen kaldiriyoruz, yoksa asagidaki
+        // kutu.scrollTop=kutu.scrollHeight yanlis/eksik bir konuma kayiyordu.
+        kutu.classList.remove("mesaj-kutusu-bos");
+        var soruGirdisi = document.getElementById("Soru");
+        var soruMetni = soruGirdisi.value;
+
+        // Girdiyi SADECE gorsel olarak bosaltir (rengi seffaf yapar) - "value"
+        // ozelligine DOKUNULMAZ. Native POST'un form-data listesi bu "submit"
+        // dinleyicisi bittikten SONRA olusturulur; onceden buraya "value = ''"
+        // yazilmasi Soru'nun null/bos gitmesine (duzeltilen hataya) yol acmisti.
+        soruGirdisi.classList.add("soru-girdi-temizlendi");
 
         var soruBalonu = document.createElement("div");
         soruBalonu.className = "d-flex justify-content-end mb-3 mesaj-satiri";
@@ -3424,6 +3502,12 @@
               '</div>';
         kutu.appendChild(yaziyorSatiri);
 
+        // parlamayiBalonaTasi #parlama'yi "su an gorunen konumuyla birebir
+        // ayni noktaya" sabitleyerek absolute'tan fixed'e gecirir (bkz. o
+        // fonksiyondaki yorum) - bu yuzden BURADA, herhangi bir scroll
+        // olmadan HEMEN cagrilir; scroll'u ondan ONCEYE almak #parlama'yi
+        // yanlis/kaymis bir noktada dondurup gorunur bir sicramaya yol
+        // aciyordu (kisa mesajlarda bile). scroll-to-bottom ONDAN SONRA.
         if (ilkMesajMi) {
             var parlama = document.getElementById("parlama");
             var yaziyorBalonu = yaziyorSatiri.querySelector(".chat-balon");
