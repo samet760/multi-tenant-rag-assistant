@@ -678,6 +678,28 @@
 
         var sonKareZamani = 0;
         var sonAlanZamani = 0;
+        // detParlamaDondu: TANI (kullanici geri bildirimi, on ikinci tur -
+        // "mesaj gittigi anda baloncugun bi kismi kirmizi bi kismi turuncu
+        // oluyor", acik temada) - handoff aninda (detMorphBaslat) #parlama
+        // (ESKI, prosedurel top) ile YENI deterministik canvas ~100ms
+        // (DET_GECIS_SURESI) boyunca CAPRAZ SOLUYOR (biri 1->0, digeri 0->1
+        // opaklik). #parlama'nin KENDI gradyani (gradyanOlustur) SABIT bir
+        // ekran-uzayi kosegeni (sol-ust->sag-alt) kullanir; YENI canvas'in
+        // gradyani ISE gercek seyahat yonune (detDirX/Y, mesaj kutusuna
+        // dogru) hizalanir - bu iki eksen SEYAHAT YONUNE gore CAKISMAZ (asagi-
+        // saga giden bir seyahat DISINDA). USTELIK #parlama'nin dongu()'su bu
+        // ~100ms boyunca fizik/parcacik/gradyan'i HER KAREDE yeniden
+        // hesaplamaya DEVAM ediyordu (parlama-gizli sinifi setTimeout ile
+        // GECIKMELI ekleniyor, "solurken canli gorunsun" diye) - yani iki
+        // FARKLI eksenli gradyan, biri SABIT durmayip SUREKLI titreşerek,
+        // ~100ms CAKISIYORDU - "bi kismi kirmizi bi kismi turuncu" ani/lekeli
+        // gorunumun sebebi bu. Cozum: detMorphBaslat, opaklik solmasini
+        // baslattigi ANDA bu bayragi true yapar - dongu() ARTIK yeniden
+        // CIZMEZ (fizik de atlanir), #parlama SON haliyle (donmus tek kare)
+        // solur - iki eksen arasindaki uyusmazlik hala var ama ARTIK
+        // TITRESMEDEN, KISA (~100ms) statik bir capraz-solma olarak
+        // gorunur, cok daha az goze batar.
+        var detParlamaDondu = false;
 
         // MANYETIK CEKIM (SADECE ilk mesaj Şey-seyahati sirasinda aktif -
         // bkz. asagidaki window.__parlamaManyetikBaslat/manyetikKuvvetiUygula).
@@ -1415,7 +1437,7 @@
         // 7) Ana dongu: gercek gecen zamana (dt) dayali fizik, #parlama gizliyken atlanir,
         // pahali alan/render adimi ~30fps'e sinirlanir, fizik ise her kare guncellenir.
         function dongu(zamanMs) {
-            if (parlama.classList.contains("parlama-gizli")) {
+            if (parlama.classList.contains("parlama-gizli") || detParlamaDondu) {
                 sonKareZamani = 0; // gorunur oldugunda dt sicramasi yasanmasin
                 requestAnimationFrame(dongu);
                 return;
@@ -1827,7 +1849,16 @@
         // ani" YOKTUR. detMorphSuresi artik seyahatSure'nin ~%95'i - taper
         // icin cok daha fazla kare/zaman.
         var DET_MORPH_BASLANGIC_ORANI = 0.05;
-        var DET_GECIS_SURESI = 100;                   // ms - #parlama -> canvas crossfade suresi (istek #6, 80-120ms araliginda)
+        // DET_GECIS_SURESI: YENIDEN TANI (kullanici geri bildirimi, on ucuncu
+        // tur - "renkler daha da kotu oldu, hepsi farkli yerdeymis gibi") -
+        // #parlama'nin (SABIT ekran-kosegeni gradyanli) ve yeni canvas'in
+        // (seyahat-yonu gradyanli) eksenleri farkli oldugundan, ikisi ne
+        // kadar UZUN sure AYNI ANDA gorunurse renk uyusmazligi o kadar
+        // belirgin oluyor (detParlamaDondu ile titreme onlendi ama eksen
+        // farki HALA var). 100ms yerine 50ms - cakisma penceresi yariya
+        // indi, "pop" riskini detParlamaDondu (donmus/sabit son kare, ani
+        // sicrama yok) zaten azaltiyor.
+        var DET_GECIS_SURESI = 50;                    // ms - #parlama -> canvas crossfade suresi
         var DET_GOVDE_ARKA_KATSAYI = 1.05;            // govde "arka kutup" mesafesi = govdeYariGenislik * bu
         var DET_GOVDE_KAIDE_PAY_ORANI = 0.5;          // govde merkezi, boyun kaidesinin govdeYariGenislik*bu KADAR gerisinde
         var DET_GOVDE_YARIGENISLIK_BASLANGIC = 1.00;  // m=0'da govde yari-genisligi (handoffYaricap'a gore)
@@ -1847,16 +1878,19 @@
         // NISBETEN KALIN (0.42) baslayip govdeyle BIRLIKTE zamanla
         // uzuyor/inceliyordu - ilk birkac karede goz hala "sade, duz bir
         // top" goruyordu, ince/uzun kisim BELIRGINLESMESI biraz zaman
-        // aliyordu. Kullanicinin onayladigi cozum: SADECE govde (top kismi)
-        // GERCEK el-degistirme boyutuyla (detHandoffYaricap - boyut
-        // sicramasi OLMAMASI icin ZORUNLU) baslayip m=1'e kadar kucculmeye
-        // DEVAM eder (DET_GOVDE_YARIGENISLIK_BASLANGIC/BITIS DEGISMEDI) -
-        // ama BOYUN/UC artik m=0'da ZATEN kendi BITIS (nihai) degerlerinde
-        // baslar (BASLANGIC=BITIS) - "gorunumu ilk kareden itibaren zaten
-        // ince/uzun, sadece govde zaman icinde kucculuyor" (DET_*_ASAMA_*
-        // staged-growth pencereleri bu iki boyut icin artik ETKISIZ kalir -
-        // BASLANGIC=BITIS oldugundan interpolasyon deltasi sifirdir, kod
-        // KIRILMAZ, sadece no-op olur).
+        // aliyordu. O turde BOYUN/UC m=0'da ZATEN BITIS (nihai) degerinde
+        // baslayacak sekilde SABITLENMISTI (BASLANGIC=BITIS) - ama bu, ONCEKI
+        // (metaball-oncesi, manyetik cekirdek-lob) surumde kullanicinin
+        // onayladigi "deformasyon yolun ortasina dogru KADEMELI artar" hissini
+        // (bkz. eski MANYETIK_BASLANGIC_ORANI=0.52) kaybetti - govde
+        // disindaki HER SEY ilk kareden itibaren zaten ince/uzundu, "gitgide
+        // incelme" goruntusu YOKTU. YENIDEN TANI (kullanici geri bildirimi,
+        // yedinci tur) - "direkt donusmesin, once hafif cekilsin, sonra
+        // gitgide incelesi artsin": BOYUN/UC yeniden BASLANGIC != BITIS
+        // yapildi (asagida), boylece DET_OMUZ_ASAMA_*/DET_UC_ASAMA_*
+        // pencereleri (asagida) tekrar AKTIF calisir - govde HALA
+        // detHandoffYaricap ile sicramasiz baslar, ama boyun/uc de artik
+        // govdeyle BIRLIKTE, kendi asama pencerelerinde kademeli inceliyor.
         // DET_BOYUN_UZUNLUK_GOVDE_ORANI: TANI (kullanici geri bildirimi,
         // altinci tur - "ikisinde de 0.5'lerde iyi gibi") - boyun uzunlugu
         // ONCEDEN SABIT bir handoffYaricap katiydi (1.35), govde ise m
@@ -1880,13 +1914,25 @@
         // bir kutle gibi gorunuyordu, "govde kocaman"). Simdi 0.15 - plato
         // GERCEKTEN ince bir "kuyruk" gibi okunuyor (govde -> hizli omuz
         // daralmasi -> ince, sabit kuyruk -> son %20'de ipince uca cokme).
-        var DET_BOYUN_KAIDE_ORANI_BASLANGIC = 0.15;   // boyunKaideYariGenislik/govdeYariGenislik orani, m=0 - ARTIK m=1 ile AYNI (bkz. yukarida TANI)
+        // YENIDEN TANI (kullanici geri bildirimi, yedinci tur) - dorduncu
+        // turde BASLANGIC=BITIS=0.15 yapilinca omuz artik m=0'dan itibaren
+        // ZATEN ince baslıyordu, "gitgide incelme" hissi kayboldu. BASLANGIC
+        // yeniden 0.42'ye (besinci tur ONCESI kullanilan ara-deger) cekildi -
+        // omuz artik DET_OMUZ_ASAMA_BASLANGIC..BITIS (asagida, 0.00-0.40)
+        // penceresinde 0.42'den 0.15'e KADEMELI daralir, BITIS DEGISMEDI
+        // (son gorunum aynen "ince kuyruk" kalir).
+        var DET_BOYUN_KAIDE_ORANI_BASLANGIC = 0.42;   // boyunKaideYariGenislik/govdeYariGenislik orani, m=0 - DET_OMUZ_ASAMA_* penceresinde BITIS'e kademeli daralir
         var DET_BOYUN_KAIDE_ORANI_BITIS = 0.15;       // ayni oran, m=1 (ve emilim boyunca SABIT kullanilir)
         // DET_UC_YARIGENISLIK_BASLANGIC/BITIS: TANI (kullanici geri
         // bildirimi, dorduncu tur) - "ipince, ince ince ince" - 0.14->0.07->
         // 0.035->0.02->0.01, DET_UC_INCELME_BASLANGIC_T (asagida) ile
-        // BIRLIKTE gercekten ipince bir yakinsama icin.
-        var DET_UC_YARIGENISLIK_BASLANGIC = 0.01;     // m=0'da uc yari-genisligi - ARTIK m=1 ile AYNI (bkz. yukarida TANI)
+        // BIRLIKTE gercekten ipince bir yakinsama icin. YENIDEN TANI
+        // (kullanici geri bildirimi, yedinci tur) - ayni "gitgide incelme"
+        // gerekcesiyle BASLANGIC yeniden 0.14'e (dorduncu turun ilk basamagi)
+        // cekildi - uc artik DET_UC_ASAMA_BASLANGIC..BITIS (asagida, tum
+        // morph suresi boyunca) penceresinde 0.14'ten ipince 0.01'e KADEMELI
+        // incelir.
+        var DET_UC_YARIGENISLIK_BASLANGIC = 0.14;     // m=0'da uc yari-genisligi - DET_UC_ASAMA_* penceresinde BITIS'e kademeli incelir
         var DET_UC_YARIGENISLIK_BITIS = 0.01;         // m=1'de uc yari-genisligi - ipince, neredeyse bir nokta
         // DET_*_ASAMA_*: TANI (kullanici geri bildirimi) - ONCEKI surumde bu
         // pencereler GEC BASLIYORDU (orn. boyun 0.20'den once HIC uzamiyordu) -
@@ -2033,7 +2079,31 @@
         // eder) - boylece crossfade bitip TAM opak oldugunda goz once "cil"i,
         // sonra AYRI/belirgin bir durgunluk anini gorur, ANCAK ONDAN SONRA
         // (m > ORANI) asil incelme baslar.
-        var DET_ANTICIPASYON_ORANI = 0.30;
+        // YENIDEN TANI (kullanici geri bildirimi, yedinci tur) - "direkt
+        // donusmesin, biraz cekilsin, sonra gitgide incelme artsin": 0.30'luk
+        // bekleme, ONCEKI (metaball-oncesi) surumde kullanicinin onayladigi
+        // esik olan eski MANYETIK_BASLANGIC_ORANI=0.52'ye kiyasla COK
+        // kisaydi. ORANI yeniden ~0.50'ye cikarildi - asil daralma artik
+        // yolun ortasina kadar baslamiyor, cil+durgunluk suresi de (ORANI*
+        // CIL_ORANI ile orantili) otomatik uzuyor.
+        // YENIDEN TANI (kullanici geri bildirimi, dokuzuncu tur - konum artik
+        // AYRI bir degisken olan konumE ile, bu ORANI'dan BAGIMSIZ surekli
+        // ilerliyor - bkz. asagida detMorphCiz) - bu ORANI artik SADECE
+        // sekli (govdeYariGenislik/boyunUzunluk/omuzE/ucE) geciktiriyor,
+        // konumu degil.
+        // YENIDEN TANI (kullanici geri bildirimi, onuncu tur - "donusum ani
+        // cok belli oluyor, sacma": 0.50'lik TAMAMEN durgun bekleme uzundu -
+        // top uzun sure hic incelmeden kalip SONRA butun sekil degiskenleri
+        // (govde/boyun/omuz/uc) AYNI ANDA birden degismeye baslayinca, bu
+        // "hicbir sey - herseyy" kontrasti keskin/ani bir "simdi donustu"
+        // olarak okunuyordu (egrinin KENDISI smoothstep ile yumusak olsa
+        // bile). Kullanicinin istedigi: "ufak bir aradan sonra ufak ufak
+        // basla, gitgide uzasin" - ORANI kucultulerek bekleme kisaltildi,
+        // boylece incelme cok daha ERKEN, KISA bir "cil+durgunluk" sonrasi
+        // baslar ve smoothstep'in KENDI yavas-baslangicini (ufak ufak) COK
+        // DAHA UZUN bir sureye (kalan ~%85) yayarak sergiler - ani bir "simdi
+        // oldu" hissi kalmaz.
+        var DET_ANTICIPASYON_ORANI = 0.15;
         var DET_ANTICIPASYON_CIL_ORANI = 0.40;
         var DET_ANTICIPASYON_GENISLIK_ORANI = 0.16;
 
@@ -2412,11 +2482,35 @@
             var kutu = detAlanKutusu(kaynaklar);
             detAlanDegerlendir(kaynaklar, kutu);
 
-            var ucNoktasi = detYerelNokta(g.merkez, g.ucU, 0);
-            var arkaNoktasi = detYerelNokta(g.merkez, -g.govdeYariGenislik * DET_GOVDE_ARKA_KATSAYI, 0);
+            // arkaNoktasi/ucNoktasi: YENIDEN TANI (kullanici geri bildirimi,
+            // on besinci tur, ekran goruntusuyle DOGRULANDI - "iki ayri
+            // renkte iki parca yan yana konmus gibi") - ONCEKI iki tur da
+            // (g.ucU, sonra max(g.ucU,govdeYariGenislik)) gradyanin nerede
+            // bitecegini TAHMIN ediyordu - GERCEK cizilen sekille HER ZAMAN
+            // birebir ORTUSMEK ZORUNDA DEGILDI. Ama detAlanKutusu (kutu,
+            // YUKARIDA zaten hesaplanmis) kaynaklarin GERCEK u-r..u+r
+            // sinirlarindan turetiliyor - alan degerlendirmesi (yukarida,
+            // detAlanDegerlendir) zaten TAM bu sinirlar icinde ciziyor. Artik
+            // TAHMIN YOK - gradyan dogrudan bu GERCEK sinira (kutu.uMin/uMax)
+            // baglaniyor, boylece sekil ne kadar kisa/uzun olursa olsun HER
+            // KAREDE TAM gorunen sekli kaplar - gradyanin erken bitip geri
+            // kalanin duz renge kilitlenmesi (sert kenar/iki-parca gorunumu)
+            // KOK NEDENiyle ortadan kalkar.
+            var arkaNoktasi = detYerelNokta(g.merkez, kutu.uMin, 0);
+            var ucNoktasi = detYerelNokta(g.merkez, kutu.uMax, 0);
             var gradyan = detCtx.createLinearGradient(arkaNoktasi.x, arkaNoktasi.y, ucNoktasi.x, ucNoktasi.y);
+            // ortaDurak: TANI (kullanici geri bildirimi, on birinci tur) -
+            // SABIT 0.55 (gradyanOlustur'un, KOMPAKT idle top icin durağı)
+            // govde/uc arasindaki BUYUK uzunluk asimetrisinde turuncu->kirmizi
+            // gecisini ince kuyruga sikistiriyordu. Orta durak artik kaideU ile
+            // ucU'nun ORTASINA, GERCEK kutu span'ina (uMin..uMax) oranla
+            // yerlestiriliyor, 0.35-0.80 arasinda sikistirilarak (on ucuncu
+            // tur) coken/cakisan durak ve asiri erken sikisma onleniyor.
+            var span = kutu.uMax - kutu.uMin;
+            var ortaDurakHam = span > 0 ? (((g.kaideU + g.ucU) / 2) - kutu.uMin) / span : 0.5;
+            var ortaDurak = Math.min(0.80, Math.max(0.35, ortaDurakHam));
             gradyan.addColorStop(0, detGovdeRenk1);
-            gradyan.addColorStop(0.55, detGovdeRenkOrta);
+            gradyan.addColorStop(ortaDurak, detGovdeRenkOrta);
             gradyan.addColorStop(1, detGovdeRenk2);
 
             var haleBuyumePx = Math.max(1, detHandoffYaricap * DET_HALE_BUYUME_ORANI);
@@ -2441,27 +2535,55 @@
             var m = t < 0 ? 0 : (t > 1 ? 1 : t);
             // mSonrasi: TANI (yukarida DET_ANTICIPASYON_* yorumu) - m'nin ILK
             // DET_ANTICIPASYON_ORANI'si boyunca 0'da SABIT kalir (govde/boyun/
-            // uc/tip HENUZ degismez - sadece asagidaki ekstraKaymaV ile bir
+            // uc HENUZ degismez - sadece asagidaki ekstraKaymaV ile bir
             // kerelik yanal "cil" olur), SONRA (m > ORANI) KALAN sureye
-            // yayilarak 0'dan 1'e smoothstep ile ilerler - asil donusum BUNUN
-            // UZERINDEN (me/omuzE/ucE, HEPSI) devam eder.
+            // yayilarak 0'dan 1'e smoothstep ile ilerler - SEKIL donusumu
+            // (govdeYariGenislik/boyunUzunluk/omuzE/ucE) BUNUN UZERINDEN
+            // devam eder.
             var mSonrasi = detPencere(m, DET_ANTICIPASYON_ORANI, 1.0);
             var me = detSmoothstep(mSonrasi);
             var omuzE = detPencere(mSonrasi, DET_OMUZ_ASAMA_BASLANGIC, DET_OMUZ_ASAMA_BITIS);
             var ucE = detPencere(mSonrasi, DET_UC_ASAMA_BASLANGIC, DET_UC_ASAMA_BITIS);
+            // konumE: YENIDEN TANI (kullanici geri bildirimi, dokuzuncu tur -
+            // "hala bekliyo, sonra hareket etmeye basliyo" + "cok hizli
+            // gelmeye baslamis gibi") - tipWorld (asagida) ONCEDEN de `me`
+            // (anticipasyon-geçitli) kullaniyordu, yani govde/boyun GIBI
+            // KONUM da bekleme boyunca (m<ANTICIPASYON_ORANI) TAMAMEN
+            // DONUYORDU - govde merkezi tipWorld'den turedigi icin (bkz.
+            // detGeometriUret) top ortada donup kaliyor, SONRA kalan mesafeyi
+            // SADECE geri kalan kisa surede kat ediyordu (ani/hizli
+            // hissettiriyordu). Konum ile sekil AYRI eksenler: kullanici
+            // SEKLIN (incelmenin) kademeli baslamasini istiyor, KONUMUN
+            // durup beklemesini DEGIL. Simdi konum HAM m'nin smoothstep'i -
+            // anticipasyon penceresinden GECMIYOR - m=0'dan itibaren
+            // KESINTISIZ ilerliyor; sadece sekil (me uzerinden) hala
+            // gecikmeli/kademeli.
+            var konumE = detSmoothstep(m);
 
             var govdeYariGenislik = detHandoffYaricap * (DET_GOVDE_YARIGENISLIK_BASLANGIC + (DET_GOVDE_YARIGENISLIK_BITIS - DET_GOVDE_YARIGENISLIK_BASLANGIC) * me);
             // boyunUzunluk artik SABIT DEGIL - CARI govdeYariGenislik'e
             // ORANLI (TANI, yukarida) - govde kuculdukce kuyruk da ORANTILI
             // kisalir, govde:kuyruk gorunumu m boyunca TUTARLI kalir.
-            var boyunUzunluk = govdeYariGenislik * DET_BOYUN_UZUNLUK_GOVDE_ORANI;
+            // YENIDEN TANI (kullanici geri bildirimi, sekizinci tur - "bekleme
+            // sirasinda yay gibi uzun kocaman bisey gorunuyor, duz topcuk
+            // olsun") - bu formul govdeYariGenislik'e oranli olsa da HICBIR
+            // ZAMAN me ile geçitlenmiyordu; bekleme fazinda (m<ANTICIPASYON_
+            // ORANI, me=0) govdeYariGenislik ZATEN tam boyutta oldugundan
+            // boyun da HER ZAMAN tam uzunlukta (2.8x) ÇİZİLİYORDU - gorunmez
+            // degil, aktif olarak "uzun ve (besinci turden beri kalinlasmis)
+            // kalin" bir boyun bekleme boyunca sabit duruyordu. Simdi govde/
+            // tipWorld gibi (asagida) *me ile geçitlendi - bekleme boyunca
+            // boyunUzunluk=0 (govde SADECE kendi kaidePay'i kadar bir uc'a
+            // sahip, duz yuvarlak "topcuk" gorunumu), me 0'dan 1'e ilerledikce
+            // boyun SIFIRDAN kademeli uzuyor/inceliyor.
+            var boyunUzunluk = govdeYariGenislik * DET_BOYUN_UZUNLUK_GOVDE_ORANI * me;
             var kaideOrani = DET_BOYUN_KAIDE_ORANI_BASLANGIC + (DET_BOYUN_KAIDE_ORANI_BITIS - DET_BOYUN_KAIDE_ORANI_BASLANGIC) * omuzE;
             var boyunKaideYariGenislik = govdeYariGenislik * kaideOrani;
             var ucYariGenislik = detHandoffYaricap * (DET_UC_YARIGENISLIK_BASLANGIC + (DET_UC_YARIGENISLIK_BITIS - DET_UC_YARIGENISLIK_BASLANGIC) * ucE);
 
             var tipWorld = {
-                x: detTipBaslangic.x + (detTemasWorld.x - detTipBaslangic.x) * me,
-                y: detTipBaslangic.y + (detTemasWorld.y - detTipBaslangic.y) * me
+                x: detTipBaslangic.x + (detTemasWorld.x - detTipBaslangic.x) * konumE,
+                y: detTipBaslangic.y + (detTemasWorld.y - detTipBaslangic.y) * konumE
             };
 
             var g = detGeometriUret(tipWorld, boyunUzunluk, govdeYariGenislik, boyunKaideYariGenislik, ucYariGenislik);
@@ -2587,6 +2709,13 @@
             detCtx = detCanvas.getContext("2d");
             detGeciciTuval = detGeciciOlustur();
             detGeciciCtx = detGeciciTuval.getContext("2d");
+
+            // detParlamaDondu: TANI (yukarida, tanim yerinde) - #parlama'nin
+            // KENDI dongu()'sunu burada, opaklik solmasi baslamadan HEMEN
+            // ONCE durduruyoruz - solan kare ARTIK SABIT (donmus), yeni
+            // canvas'in FARKLI eksenli gradyaniyla cakisirken bile TITREMEDEN
+            // kisa/statik bir capraz-solma olarak gorunur.
+            detParlamaDondu = true;
 
             if (seyahatAnim.pause) { seyahatAnim.pause(); }
             try {
