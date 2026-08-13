@@ -1903,7 +1903,11 @@
         // DEGIL - CARI govdeYariGenislik'e ORANLI (boyunKaideYariGenislik
         // gibi) - govde kuculdukce kuyruk da ORANTILI kisalir, gorunum
         // (govde:kuyruk orani) m=0'dan m=1'e KADAR SABIT/tutarli kalir.
-        var DET_BOYUN_UZUNLUK_GOVDE_ORANI = 2.8;      // TANI (kullanici geri bildirimi, altinci tur) "kuyruk biraz daha uzun olsun, boylece daha ince gorunsun", 2.0'dan artirildi
+        // YENIDEN TANI (kullanici geri bildirimi, on altinci tur - "limit
+        // testi", en ince/en uzun ucu deneyelim, kotu olursa geri donecegiz) -
+        // 2.8'den 3.6'ya cikarildi, kuyruk daha da uzuyor. On sekizinci tur -
+        // 3.6 biraz fazla geldi, 3.2'ye ayarlandi.
+        var DET_BOYUN_UZUNLUK_GOVDE_ORANI = 3.2;      // TANI (kullanici geri bildirimi, altinci tur) "kuyruk biraz daha uzun olsun, boylece daha ince gorunsun", 2.0'dan artirildi
         // DET_BOYUN_KAIDE_ORANI_BASLANGIC/BITIS: TANI (kullanici geri
         // bildirimi, besinci tur - "gövde kocaman oldu") - 0.42 degeri,
         // boyunKaide->uc SUREKLI/kesintisiz daralan bir egrinin SADECE
@@ -1922,7 +1926,9 @@
         // penceresinde 0.42'den 0.15'e KADEMELI daralir, BITIS DEGISMEDI
         // (son gorunum aynen "ince kuyruk" kalir).
         var DET_BOYUN_KAIDE_ORANI_BASLANGIC = 0.42;   // boyunKaideYariGenislik/govdeYariGenislik orani, m=0 - DET_OMUZ_ASAMA_* penceresinde BITIS'e kademeli daralir
-        var DET_BOYUN_KAIDE_ORANI_BITIS = 0.15;       // ayni oran, m=1 (ve emilim boyunca SABIT kullanilir)
+        // YENIDEN TANI (kullanici geri bildirimi, on altinci tur - "limit
+        // testi") - 0.15'ten 0.10'a dusuruldu, boyun daha da inceliyor.
+        var DET_BOYUN_KAIDE_ORANI_BITIS = 0.10;       // ayni oran, m=1 (ve emilim boyunca SABIT kullanilir)
         // DET_UC_YARIGENISLIK_BASLANGIC/BITIS: TANI (kullanici geri
         // bildirimi, dorduncu tur) - "ipince, ince ince ince" - 0.14->0.07->
         // 0.035->0.02->0.01, DET_UC_INCELME_BASLANGIC_T (asagida) ile
@@ -1933,7 +1939,15 @@
         // morph suresi boyunca) penceresinde 0.14'ten ipince 0.01'e KADEMELI
         // incelir.
         var DET_UC_YARIGENISLIK_BASLANGIC = 0.14;     // m=0'da uc yari-genisligi - DET_UC_ASAMA_* penceresinde BITIS'e kademeli incelir
-        var DET_UC_YARIGENISLIK_BITIS = 0.01;         // m=1'de uc yari-genisligi - ipince, neredeyse bir nokta
+        // YENIDEN TANI (kullanici geri bildirimi, on altinci tur - "limit
+        // testi") - 0.01'den 0.006'ya dusuruldu. RISK: detAlanDegerlendir'in
+        // alan formulu (r^2/(d^2+1)) MUTLAK piksel biriminde - yaricap COK
+        // kucuk (sub-piksel) olunca tek bir kaynagin kendi katkisi esigin
+        // (DET_ALAN_ESIK=1) COK altina duser; komsu kaynaklarin sik
+        // paketlenmesi (adaptif araliklama) YETERLI ORTUSMEYI genelde
+        // korur, ama eger uc kismi KOPUK/parcali gorunurse (delik/adacik),
+        // ilk supheli bu deger - geri 0.01'e alinmali.
+        var DET_UC_YARIGENISLIK_BITIS = 0.006;        // m=1'de uc yari-genisligi - ipince, neredeyse bir nokta
         // DET_*_ASAMA_*: TANI (kullanici geri bildirimi) - ONCEKI surumde bu
         // pencereler GEC BASLIYORDU (orn. boyun 0.20'den once HIC uzamiyordu) -
         // kisa toplam surede (eski DET_MORPH_BASLANGIC_ORANI=0.62) bu, govdenin
@@ -2034,7 +2048,13 @@
         // (kuvvet>1, egim yavas baslar/HIZLANIR) HIZLA ipince ucYariGenislik'e
         // coker - inceligin TAMAMI, uzunlugun KUCUK bir kismina sikistirilir
         // (bkz. asagida DET_UC_YARIGENISLIK_*).
-        var DET_UC_INCELME_BASLANGIC_T = 0.80;
+        // YENIDEN TANI (kullanici geri bildirimi, on yedinci tur - "ipince
+        // kisim kuyrugun daha buyuk bir kismini kaplasin") - 0.80'den 0.55'e
+        // dusuruldu: ipince cokme artik segmentin SON %20'si yerine SON
+        // %45'inde basliyor - govde/boyun tarafi hala SABIT/kalin kalan bir
+        // pay biraktigindan ("buyusun" korunuyor), ama ipince uc cok daha
+        // UZUN bir mesafeye yayiliyor.
+        var DET_UC_INCELME_BASLANGIC_T = 0.55;
         var DET_UC_EASE_KUVVETI = 2;
         // DET_SALINIM_*: TANI (kullanici geri bildirimi) - "ilk baştaki
         // seyimiz gibi giderken oynasin, saga sola calkalansin" - detTitreme
