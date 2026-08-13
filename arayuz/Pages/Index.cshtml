@@ -52,11 +52,42 @@
        satirda "sisirilmis oval/kapsul" olusmaz, tek satirda hala belirgin
        yuvarlak/hap gibi okunur. */
     .soru-formu-kabuk {
+        /* Buton artik flex-item DEGIL, kabugun sag-alt kosesine mutlak
+           konumlanir (bkz. .soru-formu-dugme) - bu yuzden kabuk butonun
+           konumlanma referansi olmasi icin position:relative olur. */
+        position: relative;
         border: 1px solid var(--bs-border-color);
         border-radius: 1.75rem;
         background-color: var(--bs-body-bg);
         padding: 0.375rem 0.375rem 0.375rem 1.25rem;
         transition: border-color .15s ease-in-out;
+    }
+
+    /* COKLU SATIR: buton artik metnin UZERINE binen bir overlay DEGIL -
+       kendi ayri alt kontrol sirasina iner. Kabuk dikey flex'e gecer:
+       1. sira = textarea (TAM genislik, buton icin ayrilmis bir sag bosluk
+       YOK), 2. sira = sadece butonu sag-alta hizalayan kontrol satiri. Bu
+       sayede metin coklu satirda satirin SONUNA kadar kullanilabilir -
+       buyuk bir padding-right ile "gizlice" yer ayirmiyoruz, buton fiziksel
+       olarak farkli bir satirda. JS (otomatikBoyutlandir) bu class'i,
+       olculen yukseklik tek-satir referansini astiginda ekler/kaldirir. */
+    .soru-formu-kabuk.composer-multiline {
+        display: flex;
+        flex-direction: column;
+        padding-right: 0.375rem;
+        padding-bottom: 0.375rem;
+    }
+
+    .soru-formu-kabuk.composer-multiline .soru-formu-girdi {
+        /* Tek-satir modundaki buton-rezervi (padding-right) ARTIK gerekmiyor -
+           buton bu modda ayri bir satirda, textarea'nin ustunde degil. */
+        padding-right: 0.25rem;
+    }
+
+    .soru-formu-kabuk.composer-multiline .soru-formu-dugme {
+        position: static;
+        align-self: flex-end;
+        margin-top: 0.25rem;
     }
 
     .soru-formu-girdi {
@@ -67,7 +98,16 @@
         outline: none;
         box-shadow: none;
         background: transparent;
-        padding: 0.5rem 0.25rem;
+        /* Sag padding: mutlak konumlanan gonder butonu (2.5rem genislik,
+           kabugun sag kenarindan 0.375rem icerde) icin guvenli bosluk
+           ayirir (~60px, buton + metinle arasinda kucuk bir bosluk) - metin
+           SADECE bu dar seritte butonun altina/uzerine binmez, geri kalan
+           TUM genislik (satirin geri kalani) tam sagina kadar kullanilabilir.
+           Kaydirma cubugu overflow-y:auto olunca textarea'nin KENDI sag
+           kenarinda (kabugun sag kenarina ~0.375rem yakin) belirir - butonun
+           ayni koseyi kapladigi kisimda butonun ARKASINDA/ALTINDA kalir,
+           kabuk'un uzerinde "yuzen" bos bir sutun OLUSTURMAZ. */
+        padding: 0.5rem 3.75rem 0.5rem 0.25rem;
         margin: 0;
         line-height: 1.5;
         /* TEK kaynak: ~5 satir + dikey padding. JS (otomatikBoyutlandir)
@@ -82,6 +122,11 @@
         overflow-y: hidden;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
+        /* #mesajKutusu'nda kullanilan AYNI ince/tema-renkli kaydirma cubugu -
+           kaydirma cubugu belirince sag kenarda ince, tutarli bir sekilde
+           gorunur, kalin/varsayilan tarayici cubugu gibi metni sikistirmaz. */
+        scrollbar-width: thin;
+        scrollbar-color: var(--bs-secondary-color) transparent;
     }
 
     /* site.css .form-control:focus mavi/beyaz cift box-shadow ekliyor -
@@ -100,6 +145,15 @@
     }
 
     .soru-formu-dugme {
+        /* Artik flex-item DEGIL - .soru-formu-kabuk'un (position:relative)
+           sag-alt kosesine mutlak konumlanir. Boylece textarea TAM genislikte
+           akar (sadece dar bir sag-alt kose butona ayrilir, bkz. yukaridaki
+           .soru-formu-girdi padding-right yorumu) - textarea buyudukce buton
+           konumu/boyutu HICBIR SEKILDE degismez (satir akisindan bagimsiz). */
+        position: absolute;
+        right: 0.375rem;
+        bottom: 0.375rem;
+        z-index: 1;
         width: 2.5rem;
         height: 2.5rem;
         padding: 0;
@@ -108,10 +162,6 @@
         align-items: center;
         justify-content: center;
         font-size: 1.2rem;
-        /* Textarea buyudukce buton kabugun ALT-SAGINDA sabit kalir - dikeyde
-           gerilip yeniden boyutlanmaz. */
-        align-self: flex-end;
-        flex-shrink: 0;
     }
 
     .sor-spinner-simge {
@@ -694,8 +744,8 @@
 
         <form method="post" id="soru-formu" class="mx-auto mb-5 px-3" style="max-width:800px; width:100%; flex-shrink:0;">
             <input type="hidden" name="SohbetId" value="@Model.SohbetId" />
-            <div class="d-flex align-items-end gap-2 soru-formu-kabuk">
-                <textarea asp-for="Soru" class="form-control soru-formu-girdi flex-grow-1" placeholder="Sorunuzu yazın" autocomplete="off" rows="1" maxlength="@arayuz.Pages.IndexModel.SoruMaksUzunluk" required></textarea>
+            <div class="soru-formu-kabuk">
+                <textarea asp-for="Soru" class="form-control soru-formu-girdi" placeholder="Sorunuzu yazın" autocomplete="off" rows="1" maxlength="@arayuz.Pages.IndexModel.SoruMaksUzunluk" required></textarea>
                 <button type="submit" class="btn btn-primary soru-formu-dugme" id="sor-dugmesi" aria-label="Soruyu gönder" title="Soruyu gönder">
                     <i class="bi bi-arrow-up-short sor-ok-simge" aria-hidden="true"></i>
                     <i class="bi bi-arrow-clockwise sor-spinner-simge" aria-hidden="true"></i>
@@ -3493,6 +3543,7 @@
         var soruFormu = document.getElementById("soru-formu");
         var soruGirdisi = document.getElementById("Soru");
         var sorDugmesi = document.getElementById("sor-dugmesi");
+        var soruFormuKabuk = document.querySelector(".soru-formu-kabuk");
 
         // Metin buyudukce textarea'yi asagi dogru buyutur (yatay ASLA
         // buyumez - flex-grow-1 + min-width:0 genisligi sabit tutar).
@@ -3504,6 +3555,15 @@
             var yeniYukseklikPx = Math.min(soruGirdisi.scrollHeight, maksYukseklikPx);
             soruGirdisi.style.height = yeniYukseklikPx + "px";
             soruGirdisi.style.overflowY = soruGirdisi.scrollHeight > maksYukseklikPx ? "auto" : "hidden";
+            // Coklu-satir tespiti: olculen yukseklik, sayfa yuklenirken
+            // olculen tek-satir referansindan (tekSatirYukseklikPx, ASAGIDA
+            // ilk cagrida henuz tanimsiz - o yuzden bu ilk cagrida guvenle
+            // atlanir) belirgin sekilde (1px yuvarlama payi) buyukse, kabuk
+            // "composer-multiline" duzenine gecer - metin sarilip yeni bir
+            // gorsel satira tastigi AN, sadece \n karakteri degil.
+            if (soruFormuKabuk && typeof tekSatirYukseklikPx === "number") {
+                soruFormuKabuk.classList.toggle("composer-multiline", yeniYukseklikPx > tekSatirYukseklikPx + 1);
+            }
             return yeniYukseklikPx;
         }
 
@@ -3542,6 +3602,11 @@
             soruGirdisi.style.height = tekSatirYukseklikPx + "px";
             soruGirdisi.style.overflowY = "hidden";
             soruGirdisi.scrollTop = 0;
+            // Coklu-satir duzeninden (varsa) tek-satir/kompakt duzene geri
+            // don - yukseklik zaten yukarida tek-satir referansina sifirlandi.
+            if (soruFormuKabuk) {
+                soruFormuKabuk.classList.remove("composer-multiline");
+            }
         });
     })();
 
@@ -3585,6 +3650,16 @@
         // dinleyicisi bittikten SONRA olusturulur; onceden buraya "value = ''"
         // yazilmasi Soru'nun null/bos gitmesine (duzeltilen hataya) yol acmisti.
         soruGirdisi.classList.add("soru-girdi-temizlendi");
+
+        // soruMetni YUKARIDA zaten guvenle okundu - "Soru" simdi kilitlenebilir.
+        // disabled DEGIL readOnly kullanilir: disabled bir form kontrolunun
+        // degeri native POST'un form-data listesine HIC dahil edilmez (bu da
+        // Soru==null hatasini GERI GETIRIR), readOnly ise degeri POST'a
+        // aynen dahil eder - sadece kullanicinin yazmasini engeller. Boylece
+        // istek surerken (spinner gosterilirken) kullanici "gorunmez" yeni
+        // metin yazip auto-grow'u tetikleyemez; Enter/Shift+Enter da zaten
+        // asagidaki dugme.disabled kilidiyle etkisiz kalir.
+        soruGirdisi.readOnly = true;
 
         var soruBalonu = document.createElement("div");
         soruBalonu.className = "d-flex justify-content-end mb-3 mesaj-satiri";
