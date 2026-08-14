@@ -9,10 +9,11 @@ app = FastAPI()
 class SoruIstegi(BaseModel):
     soru: str
     tenant_id: str
-    # Opsiyonel - sohbet tarafinda henuz departman secici YOK (bkz. gorev
-    # talimati), o yuzden mevcut cagiran (Index.cshtml.cs) bu alani hic
-    # gondermez ve None kalir; cevapla() bu durumda departman filtresi
-    # UYGULAMAZ (eski davranis).
+    # Opsiyonel - None = "Genel Asistan" (sohbet tarafinda departman
+    # secilmemis/acikca "Genel Asistan" secilmis). cevapla() bu durumda
+    # departmani soru embedding'inden OTOMATIK yonlendirir (bkz.
+    # sorgu.py::departman_yonlendir) - filtreyi ATLAMAZ, TUM departmanlarda
+    # aramaz.
     departman_id: int | None = None
 
 @app.post("/sor")

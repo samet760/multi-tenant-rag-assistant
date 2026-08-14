@@ -20,6 +20,9 @@ public class IndexModel : PageModel
     // Composer'daki gizli alandan (POST) veya URL'den (GET/redirect sonrasi
     // sayfa yeniden yuklendiginde, bkz. asagidaki OnPostAsync'in redirect'i)
     // baglanir - SohbetId ile AYNI ikili baglama deseni.
+    // null = "✨ Genel Asistan" (departman otomatik secilir, bkz. sorgu.py::
+    // departman_yonlendir) - DB'de karsiligi olmayan, sadece bu null durumun
+    // adi. Dolu deger = kullanicinin ACIKCA sectigi gercek departman.
     [BindProperty(SupportsGet = true)]
     public long? DepartmanId { get; set; }
 
@@ -118,10 +121,12 @@ public class IndexModel : PageModel
 
         var tenant = User.FindFirst("tenant_id")!.Value;
 
-        // FastAPI cagrilmadan ONCE dogrulanir - gecersiz/eksikse istek HIC
-        // gonderilmez, kullaniciya kucuk bir hata gosterilir (bkz. gorev
-        // talimati).
-        if (DepartmanId == null || !DepartmanGecerliMi(DepartmanId.Value, tenant))
+        // DepartmanId == null artik GECERLI bir secim: "✨ Genel Asistan"
+        // (departman Python tarafinda otomatik yonlendirilir). SADECE
+        // ACIKCA bir departman secildiyse (null degilse) sahiplik FastAPI
+        // cagrilmadan ONCE dogrulanir - gecersiz/baska tenant'a ait bir ID
+        // gonderilirse istek HIC gonderilmez, kucuk bir hata gosterilir.
+        if (DepartmanId != null && !DepartmanGecerliMi(DepartmanId.Value, tenant))
         {
             Hata = "Lütfen geçerli bir departman seçin.";
             return Page();

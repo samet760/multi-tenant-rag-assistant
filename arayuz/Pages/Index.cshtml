@@ -727,7 +727,7 @@
         <div class="d-flex justify-content-end mb-2" style="flex-shrink:0;">
             <select id="departman-secici" class="form-select form-select-sm" style="width:auto; min-width:200px;"
                     aria-label="Departman seçin">
-                <option value="" disabled selected="@(Model.DepartmanId == null)">Departman seçin</option>
+                <option value="" selected="@(Model.DepartmanId == null)">✨ Genel Asistan</option>
                 @foreach (var d in Model.Departmanlar)
                 {
                     <option value="@d.Id" selected="@(Model.DepartmanId == d.Id)">@d.Ad</option>

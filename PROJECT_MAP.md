@@ -56,10 +56,10 @@ Merkezi bir RLS/middleware YOK. Her yeni sorguda `where tenant_id = @t` (veya Py
 
 ## Departman mimarisi — mevcut durum
 
-**Adım A (bu commit) tamamlandı: sadece DB temeli.**
+Adım A–E tamamlandı: DB temeli, upload'da departman seçimi, departman-filtreli retrieval, sohbette manuel departman seçici, Genel Asistan otomatik yönlendirme.
 
-- `departmanlar` tablosu var (`tenant_id`, `ad`, UNIQUE(`tenant_id`,`ad`)).
-- `belgeler.departman_id` ve `parcalar.departman_id` eklendi, ikisi de **nullable**, `parcalar.departman_id` `tenant_id` ile aynı gerekçeyle **FK'siz denormalize**.
-- English Home için 4 departman seed edildi (bkz. `migrations/001_departmanlar.sql`). `Genel Asistan` bir departman **değil** — ileride ayrı bir yönlendirme modu olacak, DB'de satır olarak yok.
-- Mevcut belgeler/parcalar `departman_id = NULL` kaldı, backfill yapılmadı.
-- **Henüz uygulama koduna bağlanmadı** — `indeksle.py`, `servis.py`, `sorgu.py`, `Yukle`/`Index` sayfaları departman kolonlarını henüz kullanmıyor. Departman isimleri hiçbir yerde hardcode edilmemeli; ileride tenant'a göre `departmanlar` tablosundan okunmalı.
+- `departmanlar` tablosu var (`tenant_id`, `ad`, UNIQUE(`tenant_id`,`ad`)). English Home için 4 departman seed edildi (bkz. `migrations/001_departmanlar.sql`).
+- `belgeler.departman_id` ve `parcalar.departman_id` nullable, `parcalar.departman_id` `tenant_id` ile aynı gerekçeyle FK'siz denormalize. Mevcut eski satırlar `departman_id = NULL` kaldı, backfill yapılmadı.
+- Upload (`Yukle.cshtml(.cs)`) departmanı zorunlu kılar, sahiplik sunucu tarafında doğrulanır, `indeksle.py` her iki tabloya da yazar.
+- Sohbet (`Index.cshtml(.cs)`) sağ-üstte tenant'a özel bir departman seçici gösterir; seçim composer'ın gizli alanına senkronlanıp `/sor`'a `departman_id` olarak gider.
+- **`Genel Asistan` = embedding/retrieval-tabanlı dinamik departman yönlendirmesi; bir DB departmanı DEĞİL.** `DepartmanId == null` bu modu temsil eder (varsayılan, taze sohbette seçili). `sorgu.py::departman_yonlendir` soruyu (tek encode, ikinci model çağrısı yok) `departman_id IS NOT NULL` olan en yakın parçaya göre bir departmana yönlendirir; departman-etiketli hiç parça yoksa TÜM departmanlarda aramaya düşmez, güvenli "bilgi yok" cevabı döner. Kullanıcı açıkça bir departman seçtiğinde yönlendirme tamamen atlanır. Departman isimleri/ID'leri hiçbir yerde hardcode edilmedi.
