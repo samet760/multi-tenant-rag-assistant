@@ -9,6 +9,7 @@ namespace arayuz.Pages;
 public class IndexModel : PageModel
 {
     public const int SoruMaksUzunluk = 4000;
+    public const int SohbetBaslikMaksUzunluk = 100;
 
     [BindProperty]
     public string Soru { get; set; } = "";
@@ -132,6 +133,72 @@ public class IndexModel : PageModel
         }
 
         return RedirectToPage(new { sohbetId = SohbetId });
+    }
+
+    // Sohbet paneli (SohbetPaneliViewComponent) satirindaki "..." menusunden
+    // cagrilir - soru sorma OnPostAsync akisindan BILINCLI olarak ayri
+    // tutulur (bkz. gorev talimati). Ikisi de senkron (Belgeler.cshtml.cs
+    // OnPostSil ile ayni stil): sadece ADO.NET cagrisi, async I/O yok.
+    public IActionResult OnPostSohbetYenidenAdlandir(long id, string? yeniBaslik, long? aktifSohbetId)
+    {
+        var tenant = User.FindFirst("tenant_id")!.Value;
+        var eposta = User.Identity!.Name;
+
+        // Bos/sadece-bosluk isim KAYDEDILMEZ - sunucu tarafi son karar
+        // mercii (istemci JS'i zaten bunu Escape/iptal gibi ele aliyor,
+        // ama JS kapaliyken veya dogrudan POST'ta da ayni kural gecerli
+        // olmali). Sessizce yok sayilir, hata gosterilmez - "adini
+        // degistir"den vazgecmis gibi davranilir.
+        var baslik = (yeniBaslik ?? "").Trim();
+        if (baslik.Length > 0)
+        {
+            if (baslik.Length > SohbetBaslikMaksUzunluk)
+            {
+                baslik = baslik.Substring(0, SohbetBaslikMaksUzunluk);
+            }
+
+            using var baglanti = Db.Baglan();
+            using var komut = new NpgsqlCommand(
+                "update sohbetler set baslik = @b where id = @id and tenant_id = @t and eposta = @e", baglanti);
+            komut.Parameters.AddWithValue("b", baslik);
+            komut.Parameters.AddWithValue("id", id);
+            komut.Parameters.AddWithValue("t", tenant);
+            komut.Parameters.AddWithValue("e", eposta!);
+            komut.ExecuteNonQuery();
+        }
+
+        // Sohbet ID'si degismedi - aktif sohbet neyse (varsa) ayni sekilde
+        // acik kalir, sadece panel yeni basligi gosterir.
+        return RedirectToPage(new { sohbetId = aktifSohbetId });
+    }
+
+    public IActionResult OnPostSohbetSil(long id, long? aktifSohbetId)
+    {
+        var tenant = User.FindFirst("tenant_id")!.Value;
+        var eposta = User.Identity!.Name;
+
+        using (var baglanti = Db.Baglan())
+        using (var komut = new NpgsqlCommand(
+            // tenant_id + eposta birlikte SAHIPLIK kontrolu: sohbetler
+            // tenant icinde bile kullaniciya OZEL (bkz. MesajlariYukle/
+            // SohbetPaneliViewComponent ayni filtre) - id tarayicidan
+            // gelse bile baska bir kullanicinin sohbeti silinemez.
+            "delete from sohbetler where id = @id and tenant_id = @t and eposta = @e", baglanti))
+        {
+            // mesajlar.sohbet_id -> sohbetler.id FK'si ON DELETE CASCADE
+            // (veritabaninda dogrulandi) - bagli mesajlar burada ayrica
+            // silinmeden otomatik temizlenir, yetim mesaj KALMAZ.
+            komut.Parameters.AddWithValue("id", id);
+            komut.Parameters.AddWithValue("t", tenant);
+            komut.Parameters.AddWithValue("e", eposta!);
+            komut.ExecuteNonQuery();
+        }
+
+        // Silinen, o an acik olan sohbetse taze/bos yeni-sohbet durumuna
+        // don (sohbetId'siz /Index) - degilse acik sohbet ayni sekilde
+        // acik kalir, panelde sadece silinen satir kaybolur.
+        var silinenAktifti = aktifSohbetId.HasValue && aktifSohbetId.Value == id;
+        return RedirectToPage(new { sohbetId = silinenAktifti ? (long?)null : aktifSohbetId });
     }
 
     public class SorguYaniti

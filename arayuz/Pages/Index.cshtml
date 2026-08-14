@@ -47,14 +47,14 @@
     }
 
     /* Kabuk: gorunur kenarlik/arkaplan/sekil BURADA - textarea buyudukce
-       kabuk (flex, sabit yukseklik YOK) dogal olarak asagi buyur, radius
-       SABIT kalir (yukseklige gore yeniden olceklenen 999px DEGIL) - coklu
+       kabuk (sabit yukseklik YOK) dogal olarak asagi buyur, radius SABIT
+       kalir (yukseklige gore yeniden olceklenen 999px DEGIL) - coklu
        satirda "sisirilmis oval/kapsul" olusmaz, tek satirda hala belirgin
        yuvarlak/hap gibi okunur. */
     .soru-formu-kabuk {
-        /* Buton artik flex-item DEGIL, kabugun sag-alt kosesine mutlak
-           konumlanir (bkz. .soru-formu-dugme) - bu yuzden kabuk butonun
-           konumlanma referansi olmasi icin position:relative olur. */
+        /* Buton flex-item DEGIL, kabugun sag-alt kosesine mutlak konumlanir
+           (bkz. .soru-formu-dugme) - bu yuzden kabuk butonun konumlanma
+           referansi olmasi icin position:relative olur. */
         position: relative;
         border: 1px solid var(--bs-border-color);
         border-radius: 1.75rem;
@@ -63,32 +63,24 @@
         transition: border-color .15s ease-in-out;
     }
 
-    /* COKLU SATIR: buton artik metnin UZERINE binen bir overlay DEGIL -
-       kendi ayri alt kontrol sirasina iner. Kabuk dikey flex'e gecer:
-       1. sira = textarea (TAM genislik, buton icin ayrilmis bir sag bosluk
-       YOK), 2. sira = sadece butonu sag-alta hizalayan kontrol satiri. Bu
-       sayede metin coklu satirda satirin SONUNA kadar kullanilabilir -
-       buyuk bir padding-right ile "gizlice" yer ayirmiyoruz, buton fiziksel
-       olarak farkli bir satirda. JS (otomatikBoyutlandir) bu class'i,
-       olculen yukseklik tek-satir referansini astiginda ekler/kaldirir. */
-    .soru-formu-kabuk.composer-multiline {
-        display: flex;
-        flex-direction: column;
-        padding-right: 0.375rem;
-        padding-bottom: 0.375rem;
-    }
+    /* --- Composer'da "tek satir / coklu satir" MODU YOKTUR ---------------
+       Kutunun geometrisi (padding'ler, buton konumu, metin genisligi) metin
+       kac satir olursa olsun DEGISMEZ; buyuyen tek sey textarea'nin
+       yuksekligi. Bu bilincli bir tercih:
 
-    .soru-formu-kabuk.composer-multiline .soru-formu-girdi {
-        /* Tek-satir modundaki buton-rezervi (padding-right) ARTIK gerekmiyor -
-           buton bu modda ayri bir satirda, textarea'nin ustunde degil. */
-        padding-right: 0.25rem;
-    }
+       Onceden coklu satirda textarea'nin sag padding'i 3.75rem -> 0.25rem'e
+       dusuruluyordu (metin tam genisligi kullansin diye). Ama JS yuksekligi
+       DAR geometride olcup GENIS geometriye uyguluyordu: 2. satira yeni
+       tasmis kelime genis kutuda 1. satira geri sigiyor, sonraki tusta
+       olcum genis modda yapilinca mod geri kalkiyor, metin tekrar sariyor...
+       Sinirda her tusta 54px <-> 122px arasi titriyordu (olculdu: tek bir
+       cumle yazarken 7 kez mod degisimi).
 
-    .soru-formu-kabuk.composer-multiline .soru-formu-dugme {
-        position: static;
-        align-self: flex-end;
-        margin-top: 0.25rem;
-    }
+       Genisligi sabit tutunca bu geri besleme dongusu YAPISAL olarak
+       imkansiz hale gelir ve kutu her yeni satirda tek tip ~24px'lik adimla
+       buyur. Bedeli: metin en sagdaki ~56px'lik buton seridini hicbir
+       satirda kullanmaz - kabul edilen takas budur. Buraya tekrar bir mod
+       eklemeden once yukaridaki dongu problemini cozdugunden emin ol. */
 
     .soru-formu-girdi {
         /* Kendi kenarligi/arkaplani/golgesi YOK - hepsi .soru-formu-kabuk'a
@@ -98,23 +90,27 @@
         outline: none;
         box-shadow: none;
         background: transparent;
-        /* Sag padding: mutlak konumlanan gonder butonu (2.5rem genislik,
-           kabugun sag kenarindan 0.375rem icerde) icin guvenli bosluk
-           ayirir (~60px, buton + metinle arasinda kucuk bir bosluk) - metin
-           SADECE bu dar seritte butonun altina/uzerine binmez, geri kalan
-           TUM genislik (satirin geri kalani) tam sagina kadar kullanilabilir.
+        /* Sag padding HER SATIRDA gecerlidir (satir sayisina gore DEGISMEZ,
+           bkz. yukaridaki "MODU YOKTUR" notu): mutlak konumlanan gonder
+           butonu (2.5rem genislik, kabugun sag kenarindan 0.375rem icerde)
+           icin guvenli bosluk ayirir (~60px, buton ile metin arasinda kucuk
+           bir bosluk dahil) - metin hicbir satirda butonun altina girmez.
            Kaydirma cubugu overflow-y:auto olunca textarea'nin KENDI sag
            kenarinda (kabugun sag kenarina ~0.375rem yakin) belirir - butonun
            ayni koseyi kapladigi kisimda butonun ARKASINDA/ALTINDA kalir,
            kabuk'un uzerinde "yuzen" bos bir sutun OLUSTURMAZ. */
         padding: 0.5rem 3.75rem 0.5rem 0.25rem;
         margin: 0;
+        /* Acikca verilir: JS tek satir referansini bu degerden hesaplar
+           (bkz. tekSatirYuksekligi) - kalkarsa "normal" hesaplanir. */
         line-height: 1.5;
         /* TEK kaynak: ~5 satir + dikey padding. JS (otomatikBoyutlandir)
            buyume tavanini buradan, getComputedStyle(...).maxHeight ile okur -
            ikinci bir sayi ELLE tekrarlanmaz. */
         --soru-girdi-maks-yukseklik: 9rem;
         max-height: var(--soru-girdi-maks-yukseklik);
+        /* SADECE .tasiyor durumunda kullanilir - bkz. asagidaki kural. */
+        --soru-buton-serit: 2.625rem;
         min-width: 0;
         width: 100%;
         resize: none;
@@ -139,17 +135,36 @@
         box-shadow: none;
     }
 
+    /* Kaydirma cubugu (overflow-y:auto) textarea'nin KENDI kutusunun (padding
+       dahil) TAM yuksekligi boyunca cizilir - padding-right/bottom bunu
+       KISALTMAZ, browser scrollbar track'ini her zaman padding box'in tam
+       boyunca gezdirir. Sag padding (3.75rem) sadece METNI butonun altina
+       girmekten korur, kaydirma cubugunu DEGIL - cubuk textarea'nin KENDI
+       sag kenarinda (kabuk'a ~0.375rem yakin) belirir, ki bu AYNI x konumu
+       butonun da bulundugu yer - yani icerik tavani (9rem) asip kaydirma
+       cubugu belirdiginde cubuk ile buton gorsel olarak IC ICE giriyordu.
+       JS (otomatikBoyutlandir) tavan asilinca bu class'i ekler: textarea'nin
+       ALTINA butonun tam oturdugu kadar bir MARGIN (padding DEGIL) birakir.
+       Margin kutunun DISINDA kaldigi icin kaydirma cubugu oraya hic uzanmaz -
+       kutu artik butonun USTUNDE durur, ustune binmez. Tavan da ayni miktarda
+       dusurulur ki toplam yukseklik (metin + bosluk) onceki tavanla ayni
+       kalsin (composer daha da uzamaz). */
+    .soru-formu-girdi.tasiyor {
+        max-height: calc(var(--soru-girdi-maks-yukseklik) - var(--soru-buton-serit));
+        margin-bottom: var(--soru-buton-serit);
+    }
+
     .soru-formu-girdi.soru-girdi-temizlendi {
         color: transparent;
         caret-color: transparent;
     }
 
     .soru-formu-dugme {
-        /* Artik flex-item DEGIL - .soru-formu-kabuk'un (position:relative)
-           sag-alt kosesine mutlak konumlanir. Boylece textarea TAM genislikte
-           akar (sadece dar bir sag-alt kose butona ayrilir, bkz. yukaridaki
-           .soru-formu-girdi padding-right yorumu) - textarea buyudukce buton
-           konumu/boyutu HICBIR SEKILDE degismez (satir akisindan bagimsiz). */
+        /* Flex-item DEGIL - .soru-formu-kabuk'un (position:relative) sag-alt
+           kosesine mutlak konumlanir: metin 1 satirdan 5 satira cikarken
+           butonun kabuga gore konumu/boyutu HICBIR SEKILDE degismez, satir
+           akisindan tamamen bagimsizdir. Isgal ettigi kose metinden
+           .soru-formu-girdi'nin sabit sag padding'i ile kurtarilir. */
         position: absolute;
         right: 0.375rem;
         bottom: 0.375rem;
@@ -3543,34 +3558,61 @@
         var soruFormu = document.getElementById("soru-formu");
         var soruGirdisi = document.getElementById("Soru");
         var sorDugmesi = document.getElementById("sor-dugmesi");
-        var soruFormuKabuk = document.querySelector(".soru-formu-kabuk");
 
-        // Metin buyudukce textarea'yi asagi dogru buyutur (yatay ASLA
-        // buyumez - flex-grow-1 + min-width:0 genisligi sabit tutar).
-        // max-height (.soru-formu-girdi'deki TEK kaynak) asilinca tavanda
-        // kalir ve overflow-y "auto"ya gecer (kutu icinde kaydirma).
+        // Tam bir satirlik textarea yuksekligi (line-height + dikey padding).
+        // Sayfa yuklenirken BIR KEZ olculup onbellege ALINMAZ, her cagride
+        // hesaplanmis stilden turer - web fontu gec yuklense, pencere yeniden
+        // boyutlansa veya tarayici zoom'u degisse de referans bayatlamaz.
+        //
+        // DIKKAT: line-height "normal" ise parseFloat NaN doner ve NaN ile
+        // yapilan her aritmetik/karsilastirma sessizce bozulur.
+        // .soru-formu-girdi line-height'i 1.5 olarak acikca veriyor ama o
+        // satir bir gun kalkarsa hata fark edilmez; bu yuzden yaklasik bir
+        // yedek (1.2 x font-size, tarayicilarin "normal" icin kullandigi
+        // tipik oran) konuluyor.
+        function tekSatirYuksekligi() {
+            var stil = getComputedStyle(soruGirdisi);
+            var satirPx = parseFloat(stil.lineHeight);
+            if (!satirPx) {
+                satirPx = parseFloat(stil.fontSize) * 1.2;
+            }
+            return satirPx + parseFloat(stil.paddingTop) + parseFloat(stil.paddingBottom);
+        }
+
+        // Metin buyudukce textarea'yi SADECE asagi dogru buyutur. Yatay
+        // geometri (genislik, padding'ler, buton konumu) satir sayisindan
+        // BAGIMSIZ olarak sabittir - bkz. CSS'teki "MODU YOKTUR" notu. Bu
+        // yuzden burada olculen ile uygulanan geometri her zaman ayni;
+        // "dar'da olc, genis'te uygula" geri besleme dongusu (eski koddaki
+        // titreme) olusamaz.
         function otomatikBoyutlandir() {
+            // "tasiyor" karari HER ZAMAN class KALDIRILMIS haldeki (yani TAM,
+            // dusurulmemis) tavana gore verilir - class SU AN eklenmis olsa
+            // bile ONCE kaldirilip OYLE olculur. Bunun sebebi width/wrapping
+            // DEGIL (.tasiyor sadece max-height/margin degistirir, ikisi de
+            // scrollHeight'i ETKILEMEZ - eski koddaki padding-right/wrapping
+            // dongusuyle KARISTIRILMASIN): sadece getComputedStyle(...).maxHeight
+            // OKUMASI class'a gore FARKLI deger dondurur (class varken kucuk
+            // tavan) - class kaldirilmadan olculse yanlislikla kucuk tavana
+            // gore "hala tasiyor" denip class hicbir zaman kalkamazdi.
+            soruGirdisi.classList.remove("tasiyor");
             soruGirdisi.style.height = "auto";
+            var tamTavanPx = parseFloat(getComputedStyle(soruGirdisi).maxHeight) || Infinity;
+            soruGirdisi.classList.toggle("tasiyor", soruGirdisi.scrollHeight > tamTavanPx);
+
+            // max-height (.tasiyor eklendiyse dusurulmus tavan) asilinca
+            // tavanda kalir ve overflow-y "auto"ya gecer (kutu icinde
+            // kaydirma) - kaydirma cubugu artik textarea'nin KENDI kutusunun
+            // disinda kalan (.tasiyor'un ekledigi margin-bottom) buton
+            // seridine hic uzanmaz, bkz. CSS'teki .tasiyor yorumu.
             var maksYukseklikPx = parseFloat(getComputedStyle(soruGirdisi).maxHeight) || Infinity;
             var yeniYukseklikPx = Math.min(soruGirdisi.scrollHeight, maksYukseklikPx);
             soruGirdisi.style.height = yeniYukseklikPx + "px";
             soruGirdisi.style.overflowY = soruGirdisi.scrollHeight > maksYukseklikPx ? "auto" : "hidden";
-            // Coklu-satir tespiti: olculen yukseklik, sayfa yuklenirken
-            // olculen tek-satir referansindan (tekSatirYukseklikPx, ASAGIDA
-            // ilk cagrida henuz tanimsiz - o yuzden bu ilk cagrida guvenle
-            // atlanir) belirgin sekilde (1px yuvarlama payi) buyukse, kabuk
-            // "composer-multiline" duzenine gecer - metin sarilip yeni bir
-            // gorsel satira tastigi AN, sadece \n karakteri degil.
-            if (soruFormuKabuk && typeof tekSatirYukseklikPx === "number") {
-                soruFormuKabuk.classList.toggle("composer-multiline", yeniYukseklikPx > tekSatirYukseklikPx + 1);
-            }
             return yeniYukseklikPx;
         }
 
-        // Sayfa yuklendiginde (Soru bos) olculen yukseklik = "tek satir"
-        // referansi - submit sonrasi kutuyu gorsel olarak buna geri
-        // dondururuz (deger asagida kullaniliyor).
-        var tekSatirYukseklikPx = otomatikBoyutlandir();
+        otomatikBoyutlandir();
 
         soruGirdisi.addEventListener("input", otomatikBoyutlandir);
 
@@ -3599,14 +3641,21 @@
         // "value"ya DOKUNMUYOR) korunuyor - burada SADECE yukseklik/scroll
         // sifirlanir, bu da "value" ile ilgisiz, POST'u hicbir sekilde etkilemez.
         soruFormu.addEventListener("submit", function () {
-            soruGirdisi.style.height = tekSatirYukseklikPx + "px";
+            // Bir gonderim zaten islemdeyse (asagidaki dinleyicideki
+            // dugme.disabled kilidi) bu submit olayi orada TAMAMEN yok
+            // sayilacak - kutuyu da sifirlamayiz. Bu dinleyici once kayitli
+            // oldugu icin kilidi burada ayrica kontrol etmek gerekiyor.
+            if (sorDugmesi.disabled) {
+                return;
+            }
+            // Kutu gorsel olarak tek-satir/kompakt haline doner. Geometri
+            // (genislik/padding) zaten satir sayisindan bagimsiz oldugu icin
+            // sifirlanacak sey yukseklik ve (varsa) .tasiyor'un ekledigi
+            // buton-seridi boslugu.
+            soruGirdisi.classList.remove("tasiyor");
+            soruGirdisi.style.height = tekSatirYuksekligi() + "px";
             soruGirdisi.style.overflowY = "hidden";
             soruGirdisi.scrollTop = 0;
-            // Coklu-satir duzeninden (varsa) tek-satir/kompakt duzene geri
-            // don - yukseklik zaten yukarida tek-satir referansina sifirlandi.
-            if (soruFormuKabuk) {
-                soruFormuKabuk.classList.remove("composer-multiline");
-            }
         });
     })();
 

@@ -1,7 +1,19 @@
-@model IEnumerable<arayuz.ViewComponents.SohbetOzet>
+@using Microsoft.AspNetCore.WebUtilities
+@model arayuz.ViewComponents.SohbetPaneliModeli
 
 @{
-    var sohbetId = ViewContext.HttpContext.Request.Query["sohbetId"].ToString();
+    var istek = ViewContext.HttpContext.Request;
+    var sohbetIdMetni = istek.Query["sohbetId"].ToString();
+    long? aktifSohbetId = long.TryParse(sohbetIdMetni, out var ayristirilmisId) ? ayristirilmisId : (long?)null;
+
+    // "Daha fazla goster" baglantisi: mevcut sayfanin TUM query
+    // parametrelerini (sohbetId, Belgeler'deki Ara vb.) korur, sadece
+    // sohbetSayisi'ni bir SayfaBoyutu kadar arttirir - aktif sohbet/arama
+    // kaybolmaz, YENI bir sohbet OLUSTURULMAZ (sadece ayni sayfaya GET).
+    var sonrakiSorgu = QueryHelpers.ParseQuery(istek.QueryString.Value ?? "")
+        .ToDictionary(kv => kv.Key, kv => (string?)kv.Value.ToString());
+    sonrakiSorgu["sohbetSayisi"] = (Model.GosterilenSayisi + arayuz.ViewComponents.SohbetPaneliViewComponent.SayfaBoyutu).ToString();
+    var dahaFazlaUrl = QueryHelpers.AddQueryString(istek.Path, sonrakiSorgu);
 }
 
 <style>
@@ -92,35 +104,148 @@
         min-height: 0;
     }
 
-    .sohbet-satiri {
+    /* Satirin gorsel "hap" kabugu - hover/active arka plani, padding ve
+       radius ARTIK burada (eskiden dogrudan <a>'daydi). <a> (baslik
+       baglantisi) ve "..." menu butonu KARDES elemanlar olarak bunun icinde
+       yasar (bkz. asagidaki .sohbet-satiri / .sohbet-menu-kabuk) - boylece
+       butona tiklamak <a>'nin icine GIRMIS/IC ICE gecmis bir tiklama
+       olmuyor, dogal olarak <a>'nin navigasyonunu TETIKLEMIYOR. */
+    .sohbet-satiri-kabuk {
+        position: relative;
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        padding: 0.5rem 0.75rem;
+        gap: 0.375rem;
+        padding: 0.5rem 0.375rem 0.5rem 0.75rem;
         margin-bottom: 0.25rem;
         border-radius: 0.5rem;
-        color: var(--bs-body-color);
-        text-decoration: none;
-        transition: background-color 0.15s ease, color 0.15s ease;
+        transition: background-color 0.15s ease;
     }
 
-    .sohbet-satiri:hover {
+    /* focus-within: klavyeyle Tab ile satira girildiginde de (fareyle hover
+       etmeden) "..." butonu ve arka plan gorunur olur - bkz. asagidaki
+       .sohbet-menu-dugmesi kurali. */
+    .sohbet-satiri-kabuk:hover,
+    .sohbet-satiri-kabuk:focus-within {
         background-color: var(--bs-tertiary-bg);
-        color: var(--bs-body-color);
     }
 
-    .sohbet-satiri.active {
+    .sohbet-satiri-kabuk.aktif {
         background-color: var(--bs-secondary-bg);
-        color: var(--bs-body-color);
     }
 
-    .sohbet-satiri i {
+    .sohbet-simge {
         flex-shrink: 0;
         color: var(--bs-secondary-color);
     }
 
-    .sohbet-satiri span {
+    /* Baslik baglantisi VE onun yerini alan yeniden-adlandirma formu AYNI
+       esnek "yuvaya" oturur (ikisi de flex:1 1 auto; min-width:0) - biri
+       gizlenip digeri gosterildiginde satirin geri kalani (simge, "..."
+       butonu) YER DEGISTIRMEZ, satir genisligi SABIT kalir. */
+    .sohbet-satiri,
+    .sohbet-yeniden-adlandir-formu {
+        flex: 1 1 auto;
         min-width: 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .sohbet-satiri {
+        color: var(--bs-body-color);
+        text-decoration: none;
+    }
+
+    .sohbet-baslik-goster {
+        min-width: 0;
+    }
+
+    .sohbet-baslik-girdi {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.25rem;
+        background-color: var(--bs-body-bg);
+        color: var(--bs-body-color);
+        font-size: inherit;
+        line-height: 1.4;
+        padding: 0.05rem 0.3rem;
+    }
+
+    .sohbet-baslik-girdi:focus {
+        outline: 0;
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 0.15rem rgba(245, 158, 11, 0.35);
+    }
+
+    /* "..." butonu HER ZAMAN akista yer kaplar (opacity:0 - display:none
+       DEGIL) - boylece hover disindayken de baslik alaninin genisligi
+       AYNI kalir, hover'a girince satir GENISLEMEZ/kaymaz, sadece buton
+       gorunur olur. Kucuk (1.75rem), baslik genisliginden "buyuk bir kisim"
+       CALMAZ. */
+    .sohbet-menu-dugmesi {
+        flex-shrink: 0;
+        width: 1.75rem;
+        height: 1.75rem;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background-color: transparent;
+        color: var(--bs-secondary-color);
+        border-radius: 0.375rem;
+        opacity: 0;
+        transition: opacity 0.1s ease, background-color 0.1s ease, color 0.1s ease;
+    }
+
+    /* aria-expanded="true" (Bootstrap dropdown JS'i acikken bunu otomatik
+       ayarlar): fare satirdan ayrilsa bile menu ACIKKEN buton gorunur
+       kalmali - kapanmadan kaybolmamali. */
+    .sohbet-satiri-kabuk:hover .sohbet-menu-dugmesi,
+    .sohbet-satiri-kabuk:focus-within .sohbet-menu-dugmesi,
+    .sohbet-menu-dugmesi[aria-expanded="true"] {
+        opacity: 1;
+    }
+
+    .sohbet-menu-dugmesi:hover,
+    .sohbet-menu-dugmesi:focus-visible {
+        background-color: var(--bs-secondary-bg);
+        color: var(--bs-body-color);
+    }
+
+    .sohbet-menu-dugmesi:focus-visible {
+        outline: 0;
+        box-shadow: 0 0 0 0.15rem rgba(245, 158, 11, 0.4);
+    }
+
+    .sohbet-menu-listesi {
+        min-width: 11rem;
+    }
+
+    .sohbet-sil-onay-adim .btn {
+        white-space: nowrap;
+    }
+
+    .daha-fazla-goster-baglantisi {
+        display: block;
+        text-align: center;
+        padding: 0.4rem 0.5rem;
+        margin-top: 0.125rem;
+        font-size: 0.8rem;
+        color: var(--bs-secondary-color);
+        text-decoration: none;
+        border-radius: 0.5rem;
+    }
+
+    .daha-fazla-goster-baglantisi:hover,
+    .daha-fazla-goster-baglantisi:focus-visible {
+        color: var(--bs-body-color);
+        background-color: var(--bs-tertiary-bg);
+    }
+
+    .daha-fazla-goster-baglantisi:focus-visible {
+        outline: 0;
+        box-shadow: 0 0 0 0.15rem rgba(245, 158, 11, 0.4);
     }
 
     .sohbet-paneli-kullanici {
@@ -142,15 +267,200 @@
     <div class="sohbet-paneli-baslik mb-2">Son sohbetler</div>
 
     <div class="sohbet-paneli-listesi flex-grow-1">
-        @foreach (var s in Model)
+        @foreach (var s in Model.Sohbetler)
         {
-            <a asp-page="/Index" asp-route-sohbetId="@s.Id"
-               class="sohbet-satiri @(sohbetId == s.Id.ToString() ? "active" : "")">
-                <i class="bi bi-chat"></i>
-                <span class="text-truncate">@s.Baslik</span>
-            </a>
+            var buAktif = aktifSohbetId.HasValue && aktifSohbetId.Value == s.Id;
+
+            <div class="sohbet-satiri-kabuk @(buAktif ? "aktif" : "")" data-sohbet-id="@s.Id">
+                <i class="bi bi-chat sohbet-simge"></i>
+
+                <a asp-page="/Index" asp-route-sohbetId="@s.Id" class="sohbet-satiri">
+                    <span class="sohbet-baslik-goster text-truncate">@s.Baslik</span>
+                </a>
+
+                <form method="post" asp-page="/Index" asp-page-handler="SohbetYenidenAdlandir"
+                      class="sohbet-yeniden-adlandir-formu d-none">
+                    <input type="hidden" name="id" value="@s.Id" />
+                    <input type="hidden" name="aktifSohbetId" value="@aktifSohbetId" />
+                    <input type="text" name="yeniBaslik" class="sohbet-baslik-girdi"
+                           maxlength="@arayuz.Pages.IndexModel.SohbetBaslikMaksUzunluk"
+                           value="@s.Baslik" aria-label="Sohbet adını düzenle" autocomplete="off" />
+                </form>
+
+                <div class="dropdown sohbet-menu-kabuk">
+                    <button type="button" class="sohbet-menu-dugmesi" data-bs-toggle="dropdown"
+                            data-bs-auto-close="outside" aria-expanded="false"
+                            aria-label="Sohbet seçenekleri">
+                        <i class="bi bi-three-dots"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end sohbet-menu-listesi">
+                        <li>
+                            <button type="button" class="dropdown-item sohbet-yeniden-adlandir-baslat-dugmesi">
+                                Adını değiştir
+                            </button>
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li class="sohbet-sil-adim">
+                            <button type="button" class="dropdown-item text-danger sohbet-sil-baslat-dugmesi">
+                                Sil
+                            </button>
+                        </li>
+                        <li class="sohbet-sil-onay-adim d-none px-3 py-2">
+                            <div class="small mb-2">Bu sohbet silinsin mi?</div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1 sohbet-sil-iptal-dugmesi">
+                                    İptal
+                                </button>
+                                <form method="post" asp-page="/Index" asp-page-handler="SohbetSil" class="flex-grow-1">
+                                    <input type="hidden" name="id" value="@s.Id" />
+                                    <input type="hidden" name="aktifSohbetId" value="@aktifSohbetId" />
+                                    <button type="submit" class="btn btn-sm btn-danger w-100">Sil</button>
+                                </form>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        }
+
+        @if (Model.DahaFazlaVar)
+        {
+            <a href="@dahaFazlaUrl" class="daha-fazla-goster-baglantisi">Daha fazla göster</a>
         }
     </div>
 
     <div class="sohbet-paneli-kullanici text-truncate">@User.Identity!.Name</div>
 </div>
+
+<script>
+    /* Bu blok SohbetPaneli partial'i her render edildiginde (Index VEYA
+       Belgeler gibi baska sayfalarda) taze calisir - AJAX YOK, normal Razor
+       POST + tam sayfa yenileme akisina gore tasarlandi (bkz. gorev
+       talimati). Tum olay dinleyicileri delegation ile document/liste
+       uzerinde - satir sayisi/DOM'u degisse bile tek seferlik baglama
+       yeterli. */
+    (function () {
+        var liste = document.querySelector(".sohbet-paneli-listesi");
+        if (!liste) {
+            return;
+        }
+
+        function satiriBul(el) {
+            return el.closest(".sohbet-satiri-kabuk");
+        }
+
+        function acilirMenuyuKapat(icindekiEleman) {
+            var dugme = icindekiEleman.closest(".sohbet-menu-kabuk")?.querySelector('[data-bs-toggle="dropdown"]');
+            if (dugme && window.bootstrap && window.bootstrap.Dropdown) {
+                window.bootstrap.Dropdown.getOrCreateInstance(dugme).hide();
+            }
+        }
+
+        // ---- Yeniden adlandirma: baslik <-> girdi gecisi ----
+        function duzenlemeyiBaslat(satir) {
+            var baglanti = satir.querySelector(".sohbet-satiri");
+            var form = satir.querySelector(".sohbet-yeniden-adlandir-formu");
+            var girdi = form.querySelector(".sohbet-baslik-girdi");
+            var goster = satir.querySelector(".sohbet-baslik-goster");
+
+            girdi.value = goster.textContent.trim();
+            delete girdi.dataset.gonderildi;
+            baglanti.classList.add("d-none");
+            form.classList.remove("d-none");
+            girdi.focus();
+            girdi.select();
+        }
+
+        function duzenlemeyiIptalEt(satir) {
+            satir.querySelector(".sohbet-satiri").classList.remove("d-none");
+            satir.querySelector(".sohbet-yeniden-adlandir-formu").classList.add("d-none");
+        }
+
+        liste.addEventListener("click", function (e) {
+            var adlandirBaslatDugmesi = e.target.closest(".sohbet-yeniden-adlandir-baslat-dugmesi");
+            if (!adlandirBaslatDugmesi) {
+                return;
+            }
+            acilirMenuyuKapat(adlandirBaslatDugmesi);
+            duzenlemeyiBaslat(satiriBul(adlandirBaslatDugmesi));
+        });
+
+        liste.addEventListener("keydown", function (e) {
+            var girdi = e.target.closest(".sohbet-baslik-girdi");
+            if (!girdi) {
+                return;
+            }
+            if (e.key === "Escape") {
+                e.preventDefault();
+                duzenlemeyiIptalEt(satiriBul(girdi));
+            } else if (e.key === "Enter") {
+                e.preventDefault();
+                if (girdi.value.trim() === "") {
+                    duzenlemeyiIptalEt(satiriBul(girdi));
+                } else {
+                    // focusout dinleyicisinin AYNI kaydi ikinci kez
+                    // gondermesini onler - form.requestSubmit() sayfadan
+                    // ayrilmayi baslatirken girdi de blur olabilir.
+                    girdi.dataset.gonderildi = "1";
+                    girdi.closest("form").requestSubmit();
+                }
+            }
+        });
+
+        // Disariya tiklama: bos/degismemis ise iptal, degilse kaydet -
+        // en basit ve taninan (cogu inline-rename UI'inin) davranisi.
+        liste.addEventListener(
+            "focusout",
+            function (e) {
+                var girdi = e.target.closest(".sohbet-baslik-girdi");
+                if (!girdi || girdi.dataset.gonderildi === "1") {
+                    return;
+                }
+                var satir = satiriBul(girdi);
+                var mevcutBaslik = satir.querySelector(".sohbet-baslik-goster").textContent.trim();
+                var yeniDeger = girdi.value.trim();
+                if (yeniDeger === "" || yeniDeger === mevcutBaslik) {
+                    duzenlemeyiIptalEt(satir);
+                } else {
+                    girdi.dataset.gonderildi = "1";
+                    girdi.closest("form").requestSubmit();
+                }
+            },
+            true
+        );
+
+        // ---- Silme onayi: menu icinde adim degistirme ----
+        liste.addEventListener("click", function (e) {
+            var silBaslatDugmesi = e.target.closest(".sohbet-sil-baslat-dugmesi");
+            if (silBaslatDugmesi) {
+                var menu = silBaslatDugmesi.closest(".sohbet-menu-listesi");
+                menu.querySelector(".sohbet-sil-adim").classList.add("d-none");
+                menu.querySelector(".sohbet-sil-onay-adim").classList.remove("d-none");
+                return;
+            }
+
+            var iptalDugmesi = e.target.closest(".sohbet-sil-iptal-dugmesi");
+            if (iptalDugmesi) {
+                var menu2 = iptalDugmesi.closest(".sohbet-menu-listesi");
+                menu2.querySelector(".sohbet-sil-onay-adim").classList.add("d-none");
+                menu2.querySelector(".sohbet-sil-adim").classList.remove("d-none");
+            }
+        });
+
+        // Menu (disariya tiklanip data-bs-auto-close="outside" ile) silme
+        // onay adimi acikken kapatilirsa, bir dahaki acilista sil-onay
+        // yerine yeniden normal "Sil" adimiyla baslasin.
+        document.addEventListener("hidden.bs.dropdown", function (e) {
+            var kabuk = e.target.closest(".sohbet-menu-kabuk");
+            var menu = kabuk?.querySelector(".sohbet-menu-listesi");
+            if (!menu) {
+                return;
+            }
+            var onayAdimi = menu.querySelector(".sohbet-sil-onay-adim");
+            if (onayAdimi && !onayAdimi.classList.contains("d-none")) {
+                onayAdimi.classList.add("d-none");
+                menu.querySelector(".sohbet-sil-adim").classList.remove("d-none");
+            }
+        });
+    })();
+</script>
