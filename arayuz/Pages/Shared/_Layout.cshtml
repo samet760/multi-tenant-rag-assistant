@@ -148,7 +148,19 @@
                             <span>Doküman Asistanı</span>
                         }
                     </a>
+
+                    @* Sayfaya-ozel, marka ile tema/disli ikonlari arasina
+                       eklenen kucuk bir kontrol (orn. Index.cshtml'deki
+                       asistan/departman secici) icin bos genisletme noktasi -
+                       hicbir sayfa bunu doldurmazsa (required:false) HICBIR
+                       SEY render edilmez, diger sayfalarin navbar'i gorsel
+                       olarak AYNEN kalir. Markanin AYNI flex/gap-2 kabugunun
+                       ICINDE (disinda DEGIL) - .container'in kendi
+                       justify-content:space-between'i bu kontrolu markadan
+                       KOPARIP uzaga itmesin diye. *@
+                    @await RenderSectionAsync("UstBaslikEklentisi", required: false)
                 </div>
+
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>

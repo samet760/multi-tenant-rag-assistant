@@ -20,11 +20,21 @@ public class IndexModel : PageModel
     // Composer'daki gizli alandan (POST) veya URL'den (GET/redirect sonrasi
     // sayfa yeniden yuklendiginde, bkz. asagidaki OnPostAsync'in redirect'i)
     // baglanir - SohbetId ile AYNI ikili baglama deseni.
-    // null = "✨ Genel Asistan" (departman otomatik secilir, bkz. sorgu.py::
+    // null = "Genel Asistan" (departman otomatik secilir, bkz. sorgu.py::
     // departman_yonlendir) - DB'de karsiligi olmayan, sadece bu null durumun
     // adi. Dolu deger = kullanicinin ACIKCA sectigi gercek departman.
     [BindProperty(SupportsGet = true)]
     public long? DepartmanId { get; set; }
+
+    // Genel Asistan modunda (DepartmanId == null) EN SON sorunun otomatik
+    // yonlendirildigi departman - SADECE gorsel etiket icin (bkz.
+    // GosterilenDepartmanEtiketi). Gercek modu ASLA degistirmez: DepartmanId
+    // null kaldigi surece bir sonraki soru yine OTOMATIK yonlendirilir,
+    // burada tutulan sadece "en son ne gosterildi" bilgisidir. Kullanici
+    // elle bir departman secince (veya Genel Asistan'i yeniden secince) JS
+    // bunu temizler - composer'daki gizli alanla SENKRON.
+    [BindProperty(SupportsGet = true)]
+    public long? SonKullanilanDepartmanId { get; set; }
 
     public string Cevap { get; set; } = "";
 
@@ -74,6 +84,24 @@ public class IndexModel : PageModel
         return komut.ExecuteScalar() != null;
     }
 
+    // Ust-baslikta gosterilecek metin: GERCEK mod (DepartmanId) ile GORSEL
+    // etiket burada BILINCLI olarak ayrilir (bkz. gorev talimati).
+    // - Elle departman secilmisse (DepartmanId dolu): o departmanin adi.
+    // - Genel Asistan modundaysa (DepartmanId == null) ve en son soru bir
+    //   departmana yonlendirilmisse: o departmanin adi (KOZMETIK - mod
+    //   hala Genel Asistan, bir sonraki soru yine otomatik yonlendirilir).
+    // - Hicbiri yoksa (taze sohbet / henuz yonlendirme olmadi): "Genel Asistan".
+    public string GosterilenDepartmanEtiketi()
+    {
+        var etiketliId = DepartmanId ?? SonKullanilanDepartmanId;
+        if (etiketliId == null)
+        {
+            return "Genel Asistan";
+        }
+
+        return Departmanlar.FirstOrDefault(d => d.Id == etiketliId.Value)?.Ad ?? "Genel Asistan";
+    }
+
     private void MesajlariYukle()
     {
         if (SohbetId == null) return;
@@ -121,7 +149,7 @@ public class IndexModel : PageModel
 
         var tenant = User.FindFirst("tenant_id")!.Value;
 
-        // DepartmanId == null artik GECERLI bir secim: "✨ Genel Asistan"
+        // DepartmanId == null artik GECERLI bir secim: "Genel Asistan"
         // (departman Python tarafinda otomatik yonlendirilir). SADECE
         // ACIKCA bir departman secildiyse (null degilse) sahiplik FastAPI
         // cagrilmadan ONCE dogrulanir - gecersiz/baska tenant'a ait bir ID
@@ -131,6 +159,20 @@ public class IndexModel : PageModel
             Hata = "Lütfen geçerli bir departman seçin.";
             return Page();
         }
+
+        // Manuel modda "en son yonlendirilen" gorsel-etiket durumu ANLAMSIZ
+        // (etiket zaten dogrudan DepartmanId'den okunuyor) - istemci JS'i
+        // zaten temizliyor ama sunucu burada da GARANTI eder, eski bir
+        // kozmetik deger baska bir isteten sizip yanlislikla gorunmesin.
+        if (DepartmanId != null)
+        {
+            SonKullanilanDepartmanId = null;
+        }
+
+        // /sor'a GIDERKEN Genel Asistan modunda mi oldugumuz - cevap
+        // dondukten SONRA sadece bu durumda gorsel etiketi guncelleriz
+        // (bkz. asagisi). Elle secim akisina ASLA dokunmaz.
+        var genelAsistanModuMuydu = DepartmanId == null;
 
         var istemci = new HttpClient();
         var eposta = User.Identity!.Name;
@@ -142,6 +184,15 @@ public class IndexModel : PageModel
             var yanit = await istemci.PostAsJsonAsync("http://127.0.0.1:8000/sor", govde);
             sonuc = await yanit.Content.ReadFromJsonAsync<SorguYaniti>();
             Cevap = sonuc?.cevap ?? "";
+
+            // SADECE Genel Asistan modunda: yanitin GERCEKTEN yonlendirildigi
+            // departman gorsel etikete yansir. DepartmanId'nin KENDISI
+            // DEGISMEZ - bir sonraki soru yine otomatik yonlendirilir, farkli
+            // bir departmana cikabilir (bkz. GosterilenDepartmanEtiketi).
+            if (genelAsistanModuMuydu)
+            {
+                SonKullanilanDepartmanId = sonuc?.departman_id;
+            }
         }
         catch (Exception ex) when (ex is TimeoutException ||
             (ex is TaskCanceledException tce && tce.InnerException is TimeoutException))
@@ -191,7 +242,7 @@ public class IndexModel : PageModel
             komut.ExecuteNonQuery();
         }
 
-        return RedirectToPage(new { sohbetId = SohbetId, departmanId = DepartmanId });
+        return RedirectToPage(new { sohbetId = SohbetId, departmanId = DepartmanId, sonKullanilanDepartmanId = SonKullanilanDepartmanId });
     }
 
     // Sohbet paneli (SohbetPaneliViewComponent) satirindaki "..." menusunden
@@ -264,5 +315,10 @@ public class IndexModel : PageModel
     {
         public string cevap { get; set; } = "";
         public double? skor { get; set; }
+
+        // Yanit hangi departmanda arandi (elle secilmis ya da Genel Asistan
+        // tarafindan otomatik yonlendirilmis) - SADECE gorsel etiket icin
+        // kullanilir, bkz. OnPostAsync/GosterilenDepartmanEtiketi.
+        public long? departman_id { get; set; }
     }
 }

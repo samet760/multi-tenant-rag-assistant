@@ -18,8 +18,11 @@ class SoruIstegi(BaseModel):
 
 @app.post("/sor")
 def sor_endpoint(istek: SoruIstegi):
-    cevap, skor = cevapla(istek.soru, istek.tenant_id, istek.departman_id)
-    return {"cevap": cevap, "skor": skor}
+    # departman_id: HANGI departmanda arandigi (elle secilmis ya da Genel
+    # Asistan'in yonlendirdigi) - .NET tarafi bunu SADECE gorsel etiket icin
+    # kullanir (bkz. Index.cshtml.cs), retrieval/skor/cevap akisini etkilemez.
+    cevap, skor, departman_id = cevapla(istek.soru, istek.tenant_id, istek.departman_id)
+    return {"cevap": cevap, "skor": skor, "departman_id": departman_id}
 
 @app.post("/indeksle")
 def indeksle_endpoint(

@@ -47,10 +47,12 @@ def cevapla(soru, tenant_id, departman_id=None):
         # Genel Asistan: departman otomatik secilir. Hicbir departmana
         # yonlendirilemiyorsa (tenant'in departman-etiketli hic parcasi
         # yoksa) TUM departmanlarda arama YAPILMAZ - guvenli "bilgi yok"
-        # cevabi doner (bkz. gorev talimati).
+        # cevabi doner (bkz. gorev talimati). Ucuncu deger (departman_id)
+        # HIC belirlenemedigi icin None - cagiran (.NET) bunu "yonlendirme
+        # basarisiz, gosterilecek departman adi yok" olarak okur.
         departman_id = departman_yonlendir(tenant_id, soru_str)
         if departman_id is None:
-            return "Bu bilgi dokümanlarda yer almıyor.", 0
+            return "Bu bilgi dokümanlarda yer almıyor.", 0, None
 
     with psycopg.connect(URL) as baglanti:
         with baglanti.cursor() as imlec:
@@ -66,16 +68,19 @@ def cevapla(soru, tenant_id, departman_id=None):
             )
             satirlar = imlec.fetchall()
 
+    # departman_id BURADA HER ZAMAN dolu (elle secilmis ya da yukarida
+    # yonlendirilmis) - fonksiyon hangi departmanda arandigini HER YANITTA
+    # geri bildirir; bu SADECE raporlama, retrieval/esik/LLM akisi degismedi.
     if not satirlar or satirlar[0][1] < ESIK:
         en_iyi = satirlar[0][1] if satirlar else 0
-        return "Bu bilgi dokümanlarda yer almıyor.", en_iyi
+        return "Bu bilgi dokümanlarda yer almıyor.", en_iyi, departman_id
 
     secilen = [s[0] for s in satirlar]
-    return sor(soru, secilen), satirlar[0][1]
+    return sor(soru, secilen), satirlar[0][1], departman_id
 
 
 
 
 if __name__ == "__main__":
-    cevap, skor = cevapla("kasa sayımını kim yapar", "english-home")
-    print(skor, cevap)
+    cevap, skor, departman_id = cevapla("kasa sayımını kim yapar", "english-home")
+    print(skor, departman_id, cevap)

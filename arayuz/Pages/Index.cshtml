@@ -724,17 +724,6 @@
         </div>
     </div>
     <div class="flex-grow-1 ps-3 d-flex flex-column" style="min-width:0; min-height:0; overflow:hidden;">
-        <div class="d-flex justify-content-end mb-2" style="flex-shrink:0;">
-            <select id="departman-secici" class="form-select form-select-sm" style="width:auto; min-width:200px;"
-                    aria-label="Departman seçin">
-                <option value="" selected="@(Model.DepartmanId == null)">✨ Genel Asistan</option>
-                @foreach (var d in Model.Departmanlar)
-                {
-                    <option value="@d.Id" selected="@(Model.DepartmanId == d.Id)">@d.Ad</option>
-                }
-            </select>
-        </div>
-
         <div id="mesajKutusu" class="mb-4 @(Model.Mesajlar.Count == 0 ? "mesaj-kutusu-bos" : "")">
             @if (Model.Mesajlar.Count == 0)
             {
@@ -771,6 +760,7 @@
         <form method="post" id="soru-formu" class="mx-auto mb-5 px-3" style="max-width:800px; width:100%; flex-shrink:0;">
             <input type="hidden" name="SohbetId" value="@Model.SohbetId" />
             <input type="hidden" name="DepartmanId" id="departman-id-girdi" value="@Model.DepartmanId" />
+            <input type="hidden" name="SonKullanilanDepartmanId" id="son-kullanilan-departman-id-girdi" value="@Model.SonKullanilanDepartmanId" />
             <div class="soru-formu-kabuk">
                 <textarea asp-for="Soru" class="form-control soru-formu-girdi" placeholder="Sorunuzu yazın" autocomplete="off" rows="1" maxlength="@arayuz.Pages.IndexModel.SoruMaksUzunluk" required></textarea>
                 <button type="submit" class="btn btn-primary soru-formu-dugme" id="sor-dugmesi" aria-label="Soruyu gönder" title="Soruyu gönder">
@@ -3566,23 +3556,6 @@
         };
     }
 
-    // Sag-ust departman secicisi composer'in DISINDA (bkz. gorev talimati -
-    // composer'a yeni bir kontrol eklenmiyor/composer yeniden tasarlanmiyor).
-    // Secim, composer formunun icindeki gizli #departman-id-girdi alanina
-    // senkronlanir - tam sayfa yenilemesi GEREKMEZ, sadece o an doldurulan
-    // Soru'nun yaninda gonderilecek deger guncellenir. SohbetId hidden
-    // input'u ile AYNI desen (bkz. asagidaki composer IIFE'si).
-    (function () {
-        var secici = document.getElementById("departman-secici");
-        var gizliGirdi = document.getElementById("departman-id-girdi");
-        if (!secici || !gizliGirdi) {
-            return;
-        }
-        secici.addEventListener("change", function () {
-            gizliGirdi.value = secici.value;
-        });
-    })();
-
     (function () {
         var soruFormu = document.getElementById("soru-formu");
         var soruGirdisi = document.getElementById("Soru");
@@ -3803,3 +3776,124 @@
         kutu.scrollTop = kutu.scrollHeight;
     });
 </script>
+
+@* _Layout.cshtml'deki bos genisletme noktasini doldurur - navbar'da marka
+   ile tema/disli ikonlari ARASINDA render edilir (bkz. _Layout.cshtml).
+   Diger hicbir sayfa bu section'i tanimlamadigi icin onlarin navbar'i
+   gorsel olarak DEGISMEZ. *@
+@section UstBaslikEklentisi {
+    <style>
+        /* Normal halde GORUNMEZ (seffaf arka plan/kenarlik) - sadece etiket
+           metni + kucuk ok gorunur, buyuk/kutulu bir dugme GIBI gozukmez.
+           Hover/focus/acikken (aria-expanded=true) AYNI (mevcut) tema
+           tonlariyla ince bir kenarlik/arkaplan belirir - tiklanabilir
+           oldugu belli olur. */
+        .asistan-secici-dugme {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background-color: transparent;
+            border: 1px solid transparent;
+            border-radius: 999px;
+            padding: 0.3rem 0.75rem;
+            font-size: 0.85rem;
+            color: var(--bs-body-color);
+            transition: background-color .15s ease-in-out, border-color .15s ease-in-out;
+            /* Kabuk (English Home markasiyla AYNI, degistirilmemis
+               align-items:center satiri) bunu ortalar - marka metni logo
+               yuksekligine gore daha asagida oturdugu icin sadece BU
+               ogeyi birkac piksel asagi kaydirip iki metnin alt kenarini
+               gorsel olarak esitliyoruz. Marka/disaridaki kabuga DOKUNULMADI. */
+            position: relative;
+            top: 4px;
+        }
+
+        .asistan-secici-dugme:hover,
+        .asistan-secici-dugme:focus-visible,
+        .asistan-secici-dugme[aria-expanded="true"] {
+            background-color: var(--bs-tertiary-bg);
+            border-color: var(--bs-border-color);
+        }
+
+        .asistan-secici-dugme:focus-visible {
+            outline: 0;
+            box-shadow: 0 0 0 0.15rem rgba(245, 158, 11, 0.4);
+        }
+
+        .asistan-secici-dugme .bi-chevron-down {
+            font-size: 0.65rem;
+            color: var(--bs-secondary-color);
+        }
+    </style>
+
+    <div class="dropdown">
+        <button type="button" class="asistan-secici-dugme" data-bs-toggle="dropdown" aria-expanded="false">
+            <span id="asistan-secici-etiket">@Model.GosterilenDepartmanEtiketi()</span>
+            <i class="bi bi-chevron-down"></i>
+        </button>
+        <ul class="dropdown-menu">
+            <li>
+                <button type="button" class="dropdown-item asistan-secim-ogesi" data-departman-id="" data-departman-ad="Genel Asistan">
+                    Genel Asistan
+                </button>
+            </li>
+            @if (Model.Departmanlar.Count > 0)
+            {
+                <li><hr class="dropdown-divider" /></li>
+            }
+            @foreach (var d in Model.Departmanlar)
+            {
+                <li>
+                    <button type="button" class="dropdown-item asistan-secim-ogesi" data-departman-id="@d.Id" data-departman-ad="@d.Ad">
+                        @d.Ad
+                    </button>
+                </li>
+            }
+        </ul>
+    </div>
+
+    <script>
+        // Composer'in DISINDaki bu seciciden yapilan tiklama, composer
+        // formunun icindeki gizli alanlara YAZILIR - tam sayfa yenilemesi
+        // GEREKMEZ, sadece bir sonraki Soru gonderiminde kullanilacak deger
+        // guncellenir (SohbetId/DepartmanId hidden input'lariyla AYNI desen).
+        //
+        // ONEMLI: bu script _Layout.cshtml'deki <nav> icinde, yani
+        // composer'i (asagida, @@RenderBody() ile gelen ana icerikte) DAHA
+        // PARSE EDILMEDEN calisir - hemen document.getElementById cagirmak
+        // #departman-id-girdi/#son-kullanilan-departman-id-girdi'yi HENUZ
+        // DOM'da olmadigi icin hep null bulup sessizce (guard'a takilip)
+        // hicbir listener BAGLAMADAN cikardi (tiklama HICBIR SEY yapmiyordu).
+        // DOMContentLoaded'i bekleyerek tum govde (composer dahil) parse
+        // edildikten SONRA baglaniyoruz.
+        (function () {
+            function baglan() {
+                var etiket = document.getElementById("asistan-secici-etiket");
+                var departmanGirdisi = document.getElementById("departman-id-girdi");
+                var sonKullanilanGirdisi = document.getElementById("son-kullanilan-departman-id-girdi");
+                if (!etiket || !departmanGirdisi || !sonKullanilanGirdisi) {
+                    return;
+                }
+
+                document.querySelectorAll(".asistan-secim-ogesi").forEach(function (oge) {
+                    oge.addEventListener("click", function () {
+                        // Genel Asistan'a DONULSE bile eski "en son yonlendirilen"
+                        // kozmetik degeri temizlenir - etiket yeniden "Genel
+                        // Asistan" gosterir, YENI bir soru otomatik yonlendirilip
+                        // gercek adini gosterene kadar. Gercek departman secilince
+                        // de bu deger ANLAMSIZ - o da temizlenir.
+                        departmanGirdisi.value = oge.dataset.departmanId;
+                        sonKullanilanGirdisi.value = "";
+                        etiket.textContent = oge.dataset.departmanAd;
+                    });
+                });
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", baglan);
+            } else {
+                baglan();
+            }
+        })();
+    </script>
+}
