@@ -19,6 +19,7 @@ def sor_endpoint(istek: SoruIstegi):
 def indeksle_endpoint(
     tenant_id: str = Form(...),
     dosya_adi: str = Form(...),
+    departman_id: int = Form(...),
     dosya: UploadFile = File(...),
 ):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as gecici:
@@ -26,7 +27,7 @@ def indeksle_endpoint(
         yol = gecici.name
 
     try:
-        belge_id = indeksle(tenant_id, yol, dosya_adi)
+        belge_id = indeksle(tenant_id, yol, dosya_adi, departman_id)
     finally:
         os.remove(yol)
 

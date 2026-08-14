@@ -18,10 +18,55 @@ public class YukleModel : PageModel
     [BindProperty]
     public IFormFile? Dosya { get; set; }
 
+    [BindProperty]
+    public long? DepartmanId { get; set; }
+
     public string? Mesaj { get; set; }
+
+    public record Departman(long Id, string Ad);
+    public List<Departman> Departmanlar { get; set; } = new();
+
+    public void OnGet()
+    {
+        DepartmanlariYukle();
+    }
+
+    // Dropdown'u doldurmak icin - GET'te ve POST'ta (basarili/basarisiz
+    // her durumda sayfa yeniden render edilecegi icin) cagrilir.
+    private void DepartmanlariYukle()
+    {
+        var tenant = User.FindFirst("tenant_id")!.Value;
+
+        using var baglanti = Db.Baglan();
+        using var komut = new NpgsqlCommand(
+            "select id, ad from departmanlar where tenant_id = @t order by ad", baglanti);
+        komut.Parameters.AddWithValue("t", tenant);
+
+        using var okuyucu = komut.ExecuteReader();
+        while (okuyucu.Read())
+        {
+            Departmanlar.Add(new Departman(okuyucu.GetInt64(0), okuyucu.GetString(1)));
+        }
+    }
+
+    // Secilen departman ID'si (dropdown'dan gelen) GERCEKTEN bu tenant'a mi
+    // ait - tarayicidan gelen degere DOGRUDAN guvenilmiyor, DB'de tenant_id
+    // ile birlikte dogrulaniyor. Baska bir tenant'in departman ID'si manuel
+    // POST edilirse bu sorgu 0 satir doner ve yukleme reddedilir.
+    private bool DepartmanGecerliMi(long departmanId, string tenant)
+    {
+        using var baglanti = Db.Baglan();
+        using var komut = new NpgsqlCommand(
+            "select 1 from departmanlar where id = @d and tenant_id = @t", baglanti);
+        komut.Parameters.AddWithValue("d", departmanId);
+        komut.Parameters.AddWithValue("t", tenant);
+        return komut.ExecuteScalar() != null;
+    }
 
     public async Task OnPostAsync()
     {
+        DepartmanlariYukle();
+
         if (Dosya == null || Dosya.Length == 0)
         {
             Mesaj = "Dosya seçilmedi.";
@@ -30,9 +75,16 @@ public class YukleModel : PageModel
 
         var tenant = User.FindFirst("tenant_id")!.Value;
 
+        if (DepartmanId == null || !DepartmanGecerliMi(DepartmanId.Value, tenant))
+        {
+            Mesaj = "Lütfen geçerli bir departman seçin.";
+            return;
+        }
+
         using var icerik = new MultipartFormDataContent();
         icerik.Add(new StringContent(tenant), "tenant_id");
         icerik.Add(new StringContent(Dosya.FileName), "dosya_adi");
+        icerik.Add(new StringContent(DepartmanId.Value.ToString()), "departman_id");
         icerik.Add(new StreamContent(Dosya.OpenReadStream()), "dosya", "belge.pdf");
 
         var istemci = new HttpClient();

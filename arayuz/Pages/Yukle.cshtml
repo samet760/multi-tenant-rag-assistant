@@ -32,6 +32,17 @@
 
 <form method="post" enctype="multipart/form-data" id="yukle-formu">
     <div class="mb-3">
+        <label class="form-label">Departman</label>
+        <select asp-for="DepartmanId" class="form-select" required>
+            <option value="" selected disabled>Departman seçin</option>
+            @foreach (var d in Model.Departmanlar)
+            {
+                <option value="@d.Id">@d.Ad</option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
         <label class="form-label">Dosya</label>
         <input type="file" asp-for="Dosya" class="form-control" id="dosya-girisi" />
     </div>
