@@ -5,4 +5,4 @@ data/
 __pycache__/
 bin/
 obj/
-obj/arayuz/belge-deposu/
+arayuz/belge-deposu/
