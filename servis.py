@@ -9,10 +9,15 @@ app = FastAPI()
 class SoruIstegi(BaseModel):
     soru: str
     tenant_id: str
+    # Opsiyonel - sohbet tarafinda henuz departman secici YOK (bkz. gorev
+    # talimati), o yuzden mevcut cagiran (Index.cshtml.cs) bu alani hic
+    # gondermez ve None kalir; cevapla() bu durumda departman filtresi
+    # UYGULAMAZ (eski davranis).
+    departman_id: int | None = None
 
 @app.post("/sor")
 def sor_endpoint(istek: SoruIstegi):
-    cevap, skor = cevapla(istek.soru, istek.tenant_id)
+    cevap, skor = cevapla(istek.soru, istek.tenant_id, istek.departman_id)
     return {"cevap": cevap, "skor": skor}
 
 @app.post("/indeksle")
