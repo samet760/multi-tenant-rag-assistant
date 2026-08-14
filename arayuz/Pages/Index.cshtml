@@ -724,6 +724,17 @@
         </div>
     </div>
     <div class="flex-grow-1 ps-3 d-flex flex-column" style="min-width:0; min-height:0; overflow:hidden;">
+        <div class="d-flex justify-content-end mb-2" style="flex-shrink:0;">
+            <select id="departman-secici" class="form-select form-select-sm" style="width:auto; min-width:200px;"
+                    aria-label="Departman seçin">
+                <option value="" disabled selected="@(Model.DepartmanId == null)">Departman seçin</option>
+                @foreach (var d in Model.Departmanlar)
+                {
+                    <option value="@d.Id" selected="@(Model.DepartmanId == d.Id)">@d.Ad</option>
+                }
+            </select>
+        </div>
+
         <div id="mesajKutusu" class="mb-4 @(Model.Mesajlar.Count == 0 ? "mesaj-kutusu-bos" : "")">
             @if (Model.Mesajlar.Count == 0)
             {
@@ -759,6 +770,7 @@
 
         <form method="post" id="soru-formu" class="mx-auto mb-5 px-3" style="max-width:800px; width:100%; flex-shrink:0;">
             <input type="hidden" name="SohbetId" value="@Model.SohbetId" />
+            <input type="hidden" name="DepartmanId" id="departman-id-girdi" value="@Model.DepartmanId" />
             <div class="soru-formu-kabuk">
                 <textarea asp-for="Soru" class="form-control soru-formu-girdi" placeholder="Sorunuzu yazın" autocomplete="off" rows="1" maxlength="@arayuz.Pages.IndexModel.SoruMaksUzunluk" required></textarea>
                 <button type="submit" class="btn btn-primary soru-formu-dugme" id="sor-dugmesi" aria-label="Soruyu gönder" title="Soruyu gönder">
@@ -3553,6 +3565,23 @@
             }
         };
     }
+
+    // Sag-ust departman secicisi composer'in DISINDA (bkz. gorev talimati -
+    // composer'a yeni bir kontrol eklenmiyor/composer yeniden tasarlanmiyor).
+    // Secim, composer formunun icindeki gizli #departman-id-girdi alanina
+    // senkronlanir - tam sayfa yenilemesi GEREKMEZ, sadece o an doldurulan
+    // Soru'nun yaninda gonderilecek deger guncellenir. SohbetId hidden
+    // input'u ile AYNI desen (bkz. asagidaki composer IIFE'si).
+    (function () {
+        var secici = document.getElementById("departman-secici");
+        var gizliGirdi = document.getElementById("departman-id-girdi");
+        if (!secici || !gizliGirdi) {
+            return;
+        }
+        secici.addEventListener("change", function () {
+            gizliGirdi.value = secici.value;
+        });
+    })();
 
     (function () {
         var soruFormu = document.getElementById("soru-formu");

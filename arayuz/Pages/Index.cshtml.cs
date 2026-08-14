@@ -17,6 +17,12 @@ public class IndexModel : PageModel
     [BindProperty(SupportsGet = true)]
     public long? SohbetId { get; set; }
 
+    // Composer'daki gizli alandan (POST) veya URL'den (GET/redirect sonrasi
+    // sayfa yeniden yuklendiginde, bkz. asagidaki OnPostAsync'in redirect'i)
+    // baglanir - SohbetId ile AYNI ikili baglama deseni.
+    [BindProperty(SupportsGet = true)]
+    public long? DepartmanId { get; set; }
+
     public string Cevap { get; set; } = "";
 
     public string? Hata { get; set; }
@@ -24,9 +30,45 @@ public class IndexModel : PageModel
     public record Mesaj(string Rol, string Metin, double? Skor);
     public List<Mesaj> Mesajlar { get; set; } = new();
 
+    public record Departman(long Id, string Ad);
+    public List<Departman> Departmanlar { get; set; } = new();
+
     public void OnGet()
     {
+        DepartmanlariYukle();
         MesajlariYukle();
+    }
+
+    // Sag-ust departman secicisini doldurur - GET'te ve POST'ta (basarili/
+    // basarisiz her durumda sayfa yeniden render edilecegi icin) cagrilir,
+    // arayuz/Pages/Yukle.cshtml.cs::DepartmanlariYukle ile AYNI desen.
+    private void DepartmanlariYukle()
+    {
+        var tenant = User.FindFirst("tenant_id")!.Value;
+
+        using var baglanti = Db.Baglan();
+        using var komut = new NpgsqlCommand(
+            "select id, ad from departmanlar where tenant_id = @t order by ad", baglanti);
+        komut.Parameters.AddWithValue("t", tenant);
+
+        using var okuyucu = komut.ExecuteReader();
+        while (okuyucu.Read())
+        {
+            Departmanlar.Add(new Departman(okuyucu.GetInt64(0), okuyucu.GetString(1)));
+        }
+    }
+
+    // Secilen departman ID'si GERCEKTEN bu tenant'a mi ait - tarayicidan
+    // gelen degere DOGRUDAN guvenilmiyor, DB'de tenant_id ile birlikte
+    // dogrulaniyor (Yukle.cshtml.cs::DepartmanGecerliMi ile AYNI desen).
+    private bool DepartmanGecerliMi(long departmanId, string tenant)
+    {
+        using var baglanti = Db.Baglan();
+        using var komut = new NpgsqlCommand(
+            "select 1 from departmanlar where id = @d and tenant_id = @t", baglanti);
+        komut.Parameters.AddWithValue("d", departmanId);
+        komut.Parameters.AddWithValue("t", tenant);
+        return komut.ExecuteScalar() != null;
     }
 
     private void MesajlariYukle()
@@ -61,6 +103,8 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
+        DepartmanlariYukle();
+
         if (string.IsNullOrWhiteSpace(Soru))
         {
             return Page();
@@ -72,10 +116,20 @@ public class IndexModel : PageModel
             return Page();
         }
 
-        var istemci = new HttpClient();
         var tenant = User.FindFirst("tenant_id")!.Value;
+
+        // FastAPI cagrilmadan ONCE dogrulanir - gecersiz/eksikse istek HIC
+        // gonderilmez, kullaniciya kucuk bir hata gosterilir (bkz. gorev
+        // talimati).
+        if (DepartmanId == null || !DepartmanGecerliMi(DepartmanId.Value, tenant))
+        {
+            Hata = "Lütfen geçerli bir departman seçin.";
+            return Page();
+        }
+
+        var istemci = new HttpClient();
         var eposta = User.Identity!.Name;
-        var govde = new { soru = Soru, tenant_id = tenant };
+        var govde = new { soru = Soru, tenant_id = tenant, departman_id = DepartmanId };
 
         SorguYaniti? sonuc = null;
         try
@@ -132,7 +186,7 @@ public class IndexModel : PageModel
             komut.ExecuteNonQuery();
         }
 
-        return RedirectToPage(new { sohbetId = SohbetId });
+        return RedirectToPage(new { sohbetId = SohbetId, departmanId = DepartmanId });
     }
 
     // Sohbet paneli (SohbetPaneliViewComponent) satirindaki "..." menusunden
