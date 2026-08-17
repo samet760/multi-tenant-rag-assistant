@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Npgsql;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace arayuz.Pages;
 
@@ -182,16 +183,38 @@ public class IndexModel : PageModel
         try
         {
             var yanit = await istemci.PostAsJsonAsync("http://127.0.0.1:8000/sor", govde);
-            sonuc = await yanit.Content.ReadFromJsonAsync<SorguYaniti>();
-            Cevap = sonuc?.cevap ?? "";
 
-            // SADECE Genel Asistan modunda: yanitin GERCEKTEN yonlendirildigi
-            // departman gorsel etikete yansir. DepartmanId'nin KENDISI
-            // DEGISMEZ - bir sonraki soru yine otomatik yonlendirilir, farkli
-            // bir departmana cikabilir (bkz. GosterilenDepartmanEtiketi).
-            if (genelAsistanModuMuydu)
+            if (!yanit.IsSuccessStatusCode)
             {
-                SonKullanilanDepartmanId = sonuc?.departman_id;
+                // FastAPI 500/502 gibi basarisiz durum kodu dondurdu - govde
+                // "Internal Server Error" gibi duz metin olabilir, JSON
+                // deserialize HIC denenmez.
+                Cevap = "Yanıt oluşturulurken bir servis hatası oluştu. Lütfen tekrar deneyin.";
+            }
+            else
+            {
+                var govdeMetni = await yanit.Content.ReadAsStringAsync();
+                try
+                {
+                    sonuc = JsonSerializer.Deserialize<SorguYaniti>(govdeMetni);
+                }
+                catch (JsonException)
+                {
+                    // 200 dondu ama govde gecerli JSON degil - sadece bu
+                    // deserialize hatasi yutulur, sayfa CRASH etmez.
+                    sonuc = null;
+                }
+
+                Cevap = sonuc?.cevap ?? "Yanıt oluşturulurken bir servis hatası oluştu. Lütfen tekrar deneyin.";
+
+                // SADECE Genel Asistan modunda: yanitin GERCEKTEN yonlendirildigi
+                // departman gorsel etikete yansir. DepartmanId'nin KENDISI
+                // DEGISMEZ - bir sonraki soru yine otomatik yonlendirilir, farkli
+                // bir departmana cikabilir (bkz. GosterilenDepartmanEtiketi).
+                if (genelAsistanModuMuydu)
+                {
+                    SonKullanilanDepartmanId = sonuc?.departman_id;
+                }
             }
         }
         catch (Exception ex) when (ex is TimeoutException ||
