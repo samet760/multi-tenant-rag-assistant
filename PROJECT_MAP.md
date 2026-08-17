@@ -5,9 +5,9 @@ Kısa referans — tam mimari için kod tabanının kendisine bakılmalı, bu sa
 ## Tenant / auth akışı
 
 - `tenant_id` bir **text slug** (`"english-home"`, `"test-firma"`), `tenantlar.id`. Numeric surrogate değil.
-- Login: `arayuz/Pages/Giris.cshtml.cs` → `kullanicilar` + `tenantlar` join → `tenant_id`, `rol`, `firma_adi`, `logo_url` cookie claim'lerine yazılır (`"Cerez"` şeması).
+- Login: `arayuz/Pages/Giris.cshtml.cs` → `kullanicilar` + `tenantlar` join → `tenant_id`, `rol`, `firma_adi`, `logo_url`, **`kullanici_id`** cookie claim'lerine yazılır (`"Cerez"` şeması). `kullanici_id` = `kullanicilar.id`, sadece DB'den doğrulanmış login satırından gelir (bkz. "Erişim kontrolü" bölümü).
 - Her sayfa `User.FindFirst("tenant_id")!.Value` ile okur. Roller: `kullanici`, `yonetici` (`[Authorize(Roles="yonetici")]`).
-- Python tarafının **hiç auth bilgisi yok** — `.NET`'in her isteğe eklediği `tenant_id` string parametresine körü körüne güvenir (iç ağ, 127.0.0.1).
+- Python tarafının kendi auth mekanizması YOK — `.NET`'in her isteğe eklediği `tenant_id`/`kullanici_id`/`rol` parametrelerine güvenir (iç ağ, 127.0.0.1); bu güven `/sor` için artık sadece `tenant_id` ile sınırlı değil, RAG yetkilendirmesinin de temeli (bkz. "Erişim kontrolü").
 
 ## DB tabloları ve ilişkiler
 
@@ -65,10 +65,15 @@ Adım A–E tamamlandı: DB temeli, upload'da departman seçimi, departman-filtr
 - Sohbet (`Index.cshtml(.cs)`) sağ-üstte tenant'a özel bir departman seçici gösterir; seçim composer'ın gizli alanına senkronlanıp `/sor`'a `departman_id` olarak gider.
 - **`Genel Asistan` = embedding/retrieval-tabanlı dinamik departman yönlendirmesi; bir DB departmanı DEĞİL.** `DepartmanId == null` bu modu temsil eder (varsayılan, taze sohbette seçili). `sorgu.py::departman_yonlendir` soruyu (tek encode, ikinci model çağrısı yok) `departman_id IS NOT NULL` olan en yakın parçaya göre bir departmana yönlendirir; departman-etiketli hiç parça yoksa TÜM departmanlarda aramaya düşmez, güvenli "bilgi yok" cevabı döner. Kullanıcı açıkça bir departman seçtiğinde yönlendirme tamamen atlanır. Departman isimleri/ID'leri hiçbir yerde hardcode edilmedi.
 
-## Erişim kontrolü — DB temeli (Adım A, `migrations/002_erisim_kontrolu.sql`)
+## Erişim kontrolü (Adım A–C, tamamlandı ve runtime-test edildi)
 
-Sadece şema hazır — uygulama kodu (servis.py/sorgu.py/indeksle.py/Razor) henüz bu tabloyu/kolonları kullanmıyor, ayrı bir entegrasyon adımında bağlanacak.
+DB temeli (`migrations/002_erisim_kontrolu.sql`) ve uygulama katmanındaki zorunlu kılma (Adım C) ikisi de tamamlandı — yetkilendirme artık gerçekten uygulanıyor, sadece şema değil.
 
 - `kullanici_departmanlari` (`kullanici_id`, `departman_id`, PK ikili) — bir kullanıcının **açıkça üye olduğu** departmanları tutar, çok-çok. Hiç satır seed edilmedi (üyelik tahmin edilerek atanmaz).
-- `belgeler.erisim_seviyesi` / `parcalar.erisim_seviyesi` (nullable text, CHECK `'sirket'` / `'departman'`) — bu iki eksen BİLİNÇLİ olarak ayrı: `departman_id` belgenin **konusunu/sahipliğini** açıklar, `erisim_seviyesi` ise o belgeyi **kimin okuyabileceğini** açıklar. `'sirket'` = tenant'taki herkes okuyabilir, `'departman'` = sadece `kullanici_departmanlari` üzerinden o departmana üye kullanıcılar okuyabilir.
-- **NULL = default-deny.** Mevcut satırlar backfill edilmedi, bilinçli olarak NULL kaldı — entegrasyon tamamlanana kadar (ve entegrasyondan sonra da, seviyesi hiç atanmamış herhangi bir satır için) NULL bir satır erişime KAPALI sayılacak, "sirket" gibi açık/varsayılan sayılmayacak.
+- `belgeler.erisim_seviyesi` / `parcalar.erisim_seviyesi` (nullable text, CHECK `'sirket'` / `'departman'`) — bu iki eksen BİLİNÇLİ olarak ayrı: `departman_id` belgenin **konusunu/sahipliğini** açıklar, `erisim_seviyesi` ise o belgeyi **kimin okuyabileceğini** açıklar. `'sirket'` = tenant'taki herkes okuyabilir, `'departman'` = sadece `kullanici_departmanlari` üzerinden o departmana üye kullanıcılar (veya `yonetici`) okuyabilir.
+- **Güvenilir kimlik akışı:** `Giris.cshtml.cs` → `kullanici_id`/`rol` claim'leri → `Index.cshtml.cs::OnPostAsync` bunları (mevcut `tenant_id`/`departman_id` ile birlikte) `/sor`'a gönderir → `servis.py::SoruIstegi` (`kullanici_id`, `rol` zorunlu alanlar) → `sorgu.py::cevapla`/`departman_yonlendir`. Tarayıcıdan gelen hiçbir değere güvenilmez, sadece DB'den doğrulanmış login satırına.
+- **Yetkilendirme kuralı (`kullanici` rolü):** bir parça (`sirket` erişimliyse HERKESE), (`departman` erişimliyse VE `departman_id` doluysa VE `kullanici_departmanlari`'nda o departman için açık bir üyelik satırı varsa) okunabilir.
+- **`yonetici` MVP'de tenant admin'i gibi davranır:** `sirket` parçalarına ek olarak, aynı tenant içindeki HERHANGİ bir `departman` parçasını `kullanici_departmanlari` üyeliği ARANMADAN okuyabilir.
+- **Varsayılan-red kuralları (herkes için):** `erisim_seviyesi IS NULL` → reddedilir (ne `sirket` ne `departman` dalına uyar). `erisim_seviyesi = 'departman'` VE `departman_id IS NULL` → reddedilir. Mevcut satırlar backfill edilmedi, bilinçli olarak NULL kaldı.
+- **Predikat SQL WHERE içinde, vector `ORDER BY`/`LIMIT`'ten ÖNCE uygulanır** — yetkisiz bir parça aday havuzuna hiç girmez, sonradan filtrelenmez. AYNI predikat hem `sorgu.py::departman_yonlendir` (Genel Asistan yönlendirmesi) hem `cevapla`'nın asıl getirme sorgusunda kullanılır — manuel departman seçimi de bu predikate tabidir, ATLAYAMAZ.
+- **Runtime doğrulandı:** `sirket` izinli → erişim VAR; `NULL` erişim → RED; üyeliksiz `departman` → RED; üyelikli `departman` → erişim VAR; `yonetici` üyeliksiz `departman`'a → erişim VAR; Genel Asistan yönlendirmesi sadece yetkili aday havuzuna göre karar veriyor.
