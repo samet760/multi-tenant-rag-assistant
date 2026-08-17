@@ -20,23 +20,44 @@ def departman_yonlendir(tenant_id, soru_str, kullanici_id=None, rol=None):
     hic departman-etiketli parcasi yoksa) None doner, cagiran "bilgi yok"
     olarak ele alir.
 
-    kullanici_id / rol: ADIM C2'de SADECE parametre olarak tasiniyor - ADIM
-    C4'te bu fonksiyonun SQL'ine erisim_seviyesi/kullanici_departmanlari
-    yetkilendirme predikati eklenecek, o predikat bu ikisine ihtiyac
-    duyacak. Simdilik SQL'de KULLANILMIYOR, yonlendirme sonucunu
-    ETKILEMIYOR.
+    kullanici_id / rol: ADIM C4 - asagidaki sorgu, C3'teki asil getirme
+    sorgusuyla AYNI yetkilendirme predikatini uygular (bkz. migrations/
+    002_erisim_kontrolu.sql / PROJECT_MAP.md "Erisim kontrolu"). Yetkisiz
+    bir parca ARTIK yonlendirme adayi bile olamaz - hangi departmana
+    yonlendirilecegini SEC-ME asamasinda elenir, sadece sonradan gizlenmez.
     """
     with psycopg.connect(URL) as baglanti:
         with baglanti.cursor() as imlec:
+            # Yetkilendirme predikati C3 ile AYNI mantik, tek fark: burada
+            # tek bir departman_id'ye sabitlenmis outer filtre YOK (Genel
+            # Asistan henuz hangi departmana yonlendirecegini SECMEDI) -
+            # predikat HER aday satirin KENDI departman_id'sine gore
+            # degerlendirilir (EXISTS alt sorgusu parcalar.departman_id'yi
+            # referans alir).
             imlec.execute(
                 """
                 select departman_id
                 from parcalar
                 where tenant_id = %s and departman_id is not null
+                and (
+                    erisim_seviyesi = 'sirket'
+                    or (
+                        erisim_seviyesi = 'departman'
+                        and departman_id is not null
+                        and (
+                            %s = 'yonetici'
+                            or exists (
+                                select 1 from kullanici_departmanlari kd
+                                where kd.kullanici_id = %s
+                                  and kd.departman_id = parcalar.departman_id
+                            )
+                        )
+                    )
+                )
                 order by vektor <=> %s::vector
                 limit 1
                 """,
-                (tenant_id, soru_str),
+                (tenant_id, rol, kullanici_id, soru_str),
             )
             satir = imlec.fetchone()
 
@@ -44,10 +65,9 @@ def departman_yonlendir(tenant_id, soru_str, kullanici_id=None, rol=None):
 
 
 def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None):
-    # kullanici_id / rol: ADIM C2'de SADECE tasiniyor (servis.py'den gelen
-    # GUVENILIR .NET kimligi) - ADIM C3/C4'te retrieval/yonlendirme SQL'ine
-    # eklenecek yetkilendirme predikati bunlari kullanacak. Simdilik hicbir
-    # SQL'de KULLANILMIYOR, mevcut RAG davranisini DEGISTIRMEZ.
+    # kullanici_id / rol: servis.py'den gelen GUVENILIR .NET kimligi - hem
+    # departman_yonlendir (ADIM C4) hem asagidaki asil getirme (ADIM C3)
+    # yetkilendirme predikatinde kullanilir.
 
     # TEK encode - hem yonlendirme sorgusu hem asagidaki asil getirme AYNI
     # soru_str'i kullanir, ikinci bir model.encode() cagrisi YAPILMAZ.
