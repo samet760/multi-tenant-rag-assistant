@@ -15,9 +15,10 @@ Kısa referans — tam mimari için kod tabanının kendisine bakılmalı, bu sa
 |---|---|---|
 | `tenantlar` | `id` text (slug) PK, `ad`, `sahip_eposta`, `logo_url` | — |
 | `kullanicilar` | `id` bigint PK, `eposta` unique, `tenant_id`, `rol` | FK→`tenantlar.id` |
-| `belgeler` | `id` bigint PK, `tenant_id`, `dosya_adi`, `dosya_yolu` (nullable), `departman_id` (nullable) | FK `tenant_id→tenantlar.id`, FK `departman_id→departmanlar.id` |
-| `parcalar` | `id` bigint PK, `tenant_id` (FK'siz, denormalize), `bolum` (nullable, hep NULL — kullanılmıyor), `metin`, `vektor vector(1024)`, `belge_id`, `departman_id` (nullable, FK'siz, denormalize) | FK `belge_id→belgeler.id` ON DELETE CASCADE |
+| `belgeler` | `id` bigint PK, `tenant_id`, `dosya_adi`, `dosya_yolu` (nullable), `departman_id` (nullable), `erisim_seviyesi` (nullable text, CHECK `sirket`/`departman`) | FK `tenant_id→tenantlar.id`, FK `departman_id→departmanlar.id` |
+| `parcalar` | `id` bigint PK, `tenant_id` (FK'siz, denormalize), `bolum` (nullable, hep NULL — kullanılmıyor), `metin`, `vektor vector(1024)`, `belge_id`, `departman_id` (nullable, FK'siz, denormalize), `erisim_seviyesi` (nullable text, FK'siz denormalize, CHECK `sirket`/`departman`) | FK `belge_id→belgeler.id` ON DELETE CASCADE |
 | `departmanlar` | `id` bigserial PK, `tenant_id`, `ad`, `olusturma_tarihi`, UNIQUE(`tenant_id`,`ad`) | FK `tenant_id→tenantlar.id` |
+| `kullanici_departmanlari` | `kullanici_id` bigint, `departman_id` bigint, `olusturma_tarihi`, PK(`kullanici_id`,`departman_id`) | FK `kullanici_id→kullanicilar.id` ON DELETE CASCADE, FK `departman_id→departmanlar.id` ON DELETE CASCADE |
 | `sohbetler` | `id` bigint PK, `tenant_id`, `eposta`, `baslik` | — |
 | `mesajlar` | `id` bigint PK, `sohbet_id`, `rol`, `metin`, `skor` (nullable) | FK `sohbet_id→sohbetler.id` ON DELETE CASCADE |
 
@@ -63,3 +64,11 @@ Adım A–E tamamlandı: DB temeli, upload'da departman seçimi, departman-filtr
 - Upload (`Yukle.cshtml(.cs)`) departmanı zorunlu kılar, sahiplik sunucu tarafında doğrulanır, `indeksle.py` her iki tabloya da yazar.
 - Sohbet (`Index.cshtml(.cs)`) sağ-üstte tenant'a özel bir departman seçici gösterir; seçim composer'ın gizli alanına senkronlanıp `/sor`'a `departman_id` olarak gider.
 - **`Genel Asistan` = embedding/retrieval-tabanlı dinamik departman yönlendirmesi; bir DB departmanı DEĞİL.** `DepartmanId == null` bu modu temsil eder (varsayılan, taze sohbette seçili). `sorgu.py::departman_yonlendir` soruyu (tek encode, ikinci model çağrısı yok) `departman_id IS NOT NULL` olan en yakın parçaya göre bir departmana yönlendirir; departman-etiketli hiç parça yoksa TÜM departmanlarda aramaya düşmez, güvenli "bilgi yok" cevabı döner. Kullanıcı açıkça bir departman seçtiğinde yönlendirme tamamen atlanır. Departman isimleri/ID'leri hiçbir yerde hardcode edilmedi.
+
+## Erişim kontrolü — DB temeli (Adım A, `migrations/002_erisim_kontrolu.sql`)
+
+Sadece şema hazır — uygulama kodu (servis.py/sorgu.py/indeksle.py/Razor) henüz bu tabloyu/kolonları kullanmıyor, ayrı bir entegrasyon adımında bağlanacak.
+
+- `kullanici_departmanlari` (`kullanici_id`, `departman_id`, PK ikili) — bir kullanıcının **açıkça üye olduğu** departmanları tutar, çok-çok. Hiç satır seed edilmedi (üyelik tahmin edilerek atanmaz).
+- `belgeler.erisim_seviyesi` / `parcalar.erisim_seviyesi` (nullable text, CHECK `'sirket'` / `'departman'`) — bu iki eksen BİLİNÇLİ olarak ayrı: `departman_id` belgenin **konusunu/sahipliğini** açıklar, `erisim_seviyesi` ise o belgeyi **kimin okuyabileceğini** açıklar. `'sirket'` = tenant'taki herkes okuyabilir, `'departman'` = sadece `kullanici_departmanlari` üzerinden o departmana üye kullanıcılar okuyabilir.
+- **NULL = default-deny.** Mevcut satırlar backfill edilmedi, bilinçli olarak NULL kaldı — entegrasyon tamamlanana kadar (ve entegrasyondan sonra da, seviyesi hiç atanmamış herhangi bir satır için) NULL bir satır erişime KAPALI sayılacak, "sirket" gibi açık/varsayılan sayılmayacak.
