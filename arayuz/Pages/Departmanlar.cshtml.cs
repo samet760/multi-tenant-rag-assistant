@@ -114,4 +114,44 @@ public class DepartmanlarModel : PageModel
 
         return RedirectToPage();
     }
+
+    public IActionResult OnPostSil(long id)
+    {
+        var tenant = User.FindFirst("tenant_id")!.Value;
+
+        using var baglanti = Db.Baglan();
+        int etkilenenSatir;
+        try
+        {
+            using var komut = new NpgsqlCommand(
+                "delete from departmanlar where id = @id and tenant_id = @t", baglanti);
+            komut.Parameters.AddWithValue("id", id);
+            komut.Parameters.AddWithValue("t", tenant);
+            etkilenenSatir = komut.ExecuteNonQuery();
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            // belgeler.departman_id -> departmanlar.id FK'si (ON DELETE
+            // CLAUSE YOK, varsayilan NO ACTION) - baglantili belge varsa
+            // Postgres silmeyi burada REDDEDER, bilgi/parca ASLA sessizce
+            // silinmez. kullanici_departmanlari zaten ON DELETE CASCADE
+            // (bkz. migrations/002) - departman GERCEKTEN silinebiliyorsa
+            // ayri bir manuel temizlik GEREKMEZ.
+            Hata = "Bu departmana bağlı belgeler var. Silmeden önce bu belgeleri başka bir departmana taşıyın veya silin.";
+            Yukle();
+            return Page();
+        }
+
+        // id + tenant_id BIRLIKTE eslesmediyse (baska tenant'a ait ya da hic
+        // yok) DELETE 0 satir etkiler - YenidenAdlandir ile AYNI gerekce,
+        // cross-tenant bilgi SIZDIRILMAZ.
+        if (etkilenenSatir == 0)
+        {
+            Hata = "Departman bulunamadı.";
+            Yukle();
+            return Page();
+        }
+
+        return RedirectToPage();
+    }
 }

@@ -32,11 +32,20 @@
             <tr>
                 <td>@d.Ad</td>
                 <td>
-                    <form method="post" asp-page-handler="YenidenAdlandir" class="d-flex gap-2">
-                        <input type="hidden" name="id" value="@d.Id" />
-                        <input type="text" name="ad" value="@d.Ad" class="form-control form-control-sm" style="max-width: 220px;" required />
-                        <button type="submit" class="btn btn-sm btn-secondary">Yeniden adlandır</button>
-                    </form>
+                    <div class="d-flex gap-2">
+                        <form method="post" asp-page-handler="YenidenAdlandir" class="d-flex gap-2">
+                            <input type="hidden" name="id" value="@d.Id" />
+                            <input type="text" name="ad" value="@d.Ad" class="form-control form-control-sm" style="max-width: 220px;" required />
+                            <button type="submit" class="btn btn-sm btn-secondary">Yeniden adlandır</button>
+                        </form>
+                        <form method="post" asp-page-handler="Sil">
+                            <input type="hidden" name="id" value="@d.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('@d.Ad silinsin mi?');">
+                                Sil
+                            </button>
+                        </form>
+                    </div>
                 </td>
             </tr>
         }
