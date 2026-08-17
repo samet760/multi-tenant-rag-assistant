@@ -1,0 +1,36 @@
+@page
+@model arayuz.Pages.DepartmanlarModel
+@{
+    ViewData["Title"] = "Departmanlar";
+}
+
+<h2>Departmanlar</h2>
+
+@if (!string.IsNullOrEmpty(Model.Hata))
+{
+    <div class="alert alert-danger">@Model.Hata</div>
+}
+
+<form method="post" asp-page-handler="Ekle" class="mb-4" style="max-width: 400px;">
+    <div class="mb-2">
+        <label class="form-label">Yeni departman adı</label>
+        <input type="text" asp-for="YeniAd" class="form-control" required />
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">Ekle</button>
+</form>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Ad</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var d in Model.Liste)
+        {
+            <tr>
+                <td>@d.Ad</td>
+            </tr>
+        }
+    </tbody>
+</table>
