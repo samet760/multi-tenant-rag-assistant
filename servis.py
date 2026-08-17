@@ -19,13 +19,23 @@ class SoruIstegi(BaseModel):
     # sorgu.py::departman_yonlendir) - filtreyi ATLAMAZ, TUM departmanlarda
     # aramaz.
     departman_id: int | None = None
+    # kullanici_id / rol: .NET'in kullanici_id claim'inden (bkz.
+    # Giris.cshtml.cs) ve ClaimTypes.Role'den gonderdigi GUVENILIR kimlik -
+    # ADIM C2'de SADECE tasiniyor, HENUZ hicbir SQL'de kullanilmiyor (bkz.
+    # sorgu.py). Zorunlu alanlar - .NET bunlari her zaman gondermek zorunda
+    # (eksik kullanici_id claim'i varsa .NET istegi HIC gondermez, bkz.
+    # Index.cshtml.cs).
+    kullanici_id: int
+    rol: str
 
 @app.post("/sor")
 def sor_endpoint(istek: SoruIstegi):
     # departman_id: HANGI departmanda arandigi (elle secilmis ya da Genel
     # Asistan'in yonlendirdigi) - .NET tarafi bunu SADECE gorsel etiket icin
     # kullanir (bkz. Index.cshtml.cs), retrieval/skor/cevap akisini etkilemez.
-    cevap, skor, departman_id = cevapla(istek.soru, istek.tenant_id, istek.departman_id)
+    cevap, skor, departman_id = cevapla(
+        istek.soru, istek.tenant_id, istek.departman_id, istek.kullanici_id, istek.rol
+    )
     return {"cevap": cevap, "skor": skor, "departman_id": departman_id}
 
 @app.post("/indeksle")

@@ -10,7 +10,7 @@ ESIK = 0.54
 
 
 
-def departman_yonlendir(tenant_id, soru_str):
+def departman_yonlendir(tenant_id, soru_str, kullanici_id=None, rol=None):
     """Genel Asistan modunda (departman_id verilmemis) soruyu hangi
     departmana yonlendirecegini, TENANT'in kendi indekslenmis bilgisinden
     (embedding benzerligi) belirler - LLM'e SORULMAZ, departman adi/ID'si
@@ -19,6 +19,12 @@ def departman_yonlendir(tenant_id, soru_str):
     parcalar bu yonlendirme aramasina hic girmez. Hic sonuc yoksa (tenant'in
     hic departman-etiketli parcasi yoksa) None doner, cagiran "bilgi yok"
     olarak ele alir.
+
+    kullanici_id / rol: ADIM C2'de SADECE parametre olarak tasiniyor - ADIM
+    C4'te bu fonksiyonun SQL'ine erisim_seviyesi/kullanici_departmanlari
+    yetkilendirme predikati eklenecek, o predikat bu ikisine ihtiyac
+    duyacak. Simdilik SQL'de KULLANILMIYOR, yonlendirme sonucunu
+    ETKILEMIYOR.
     """
     with psycopg.connect(URL) as baglanti:
         with baglanti.cursor() as imlec:
@@ -37,7 +43,12 @@ def departman_yonlendir(tenant_id, soru_str):
     return satir[0] if satir else None
 
 
-def cevapla(soru, tenant_id, departman_id=None):
+def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None):
+    # kullanici_id / rol: ADIM C2'de SADECE tasiniyor (servis.py'den gelen
+    # GUVENILIR .NET kimligi) - ADIM C3/C4'te retrieval/yonlendirme SQL'ine
+    # eklenecek yetkilendirme predikati bunlari kullanacak. Simdilik hicbir
+    # SQL'de KULLANILMIYOR, mevcut RAG davranisini DEGISTIRMEZ.
+
     # TEK encode - hem yonlendirme sorgusu hem asagidaki asil getirme AYNI
     # soru_str'i kullanir, ikinci bir model.encode() cagrisi YAPILMAZ.
     soru_v = model.encode(soru, normalize_embeddings=True)
@@ -50,7 +61,7 @@ def cevapla(soru, tenant_id, departman_id=None):
         # cevabi doner (bkz. gorev talimati). Ucuncu deger (departman_id)
         # HIC belirlenemedigi icin None - cagiran (.NET) bunu "yonlendirme
         # basarisiz, gosterilecek departman adi yok" olarak okur.
-        departman_id = departman_yonlendir(tenant_id, soru_str)
+        departman_id = departman_yonlendir(tenant_id, soru_str, kullanici_id, rol)
         if departman_id is None:
             return "Bu bilgi dokümanlarda yer almıyor.", 0, None
 

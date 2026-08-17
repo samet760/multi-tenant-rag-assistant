@@ -24,10 +24,11 @@ public class GirisModel : PageModel
         string? rol = null;
         string? firmaAdi = null;
         string? logoUrl = null;
+        long? kullaniciId = null;
 
         using (var baglanti = Db.Baglan())
         using (var komut = new NpgsqlCommand(
-            @"select k.sifre_ozeti, k.tenant_id, k.rol, t.ad, t.logo_url
+            @"select k.id, k.sifre_ozeti, k.tenant_id, k.rol, t.ad, t.logo_url
               from kullanicilar k
               join tenantlar t on t.id = k.tenant_id
               where k.eposta = @e", baglanti))
@@ -36,11 +37,12 @@ public class GirisModel : PageModel
             using var okuyucu = komut.ExecuteReader();
             if (okuyucu.Read())
             {
-                ozet = okuyucu.GetString(0);
-                tenantId = okuyucu.GetString(1);
-                rol = okuyucu.GetString(2);
-                firmaAdi = okuyucu.GetString(3);
-                logoUrl = okuyucu.IsDBNull(4) ? null : okuyucu.GetString(4);
+                kullaniciId = okuyucu.GetInt64(0);
+                ozet = okuyucu.GetString(1);
+                tenantId = okuyucu.GetString(2);
+                rol = okuyucu.GetString(3);
+                firmaAdi = okuyucu.GetString(4);
+                logoUrl = okuyucu.IsDBNull(5) ? null : okuyucu.GetString(5);
             }
         }
 
@@ -55,7 +57,8 @@ public class GirisModel : PageModel
             new Claim(ClaimTypes.Name, Eposta),
             new Claim("tenant_id", tenantId!),
             new Claim(ClaimTypes.Role, rol!),
-            new Claim("firma_adi", firmaAdi!)
+            new Claim("firma_adi", firmaAdi!),
+            new Claim("kullanici_id", kullaniciId!.Value.ToString())
         };
 
         if (logoUrl != null)

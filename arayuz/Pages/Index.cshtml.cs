@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Npgsql;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text.Json;
 
 namespace arayuz.Pages;
@@ -175,9 +176,21 @@ public class IndexModel : PageModel
         // (bkz. asagisi). Elle secim akisina ASLA dokunmaz.
         var genelAsistanModuMuydu = DepartmanId == null;
 
+        // "kullanici_id" claim'i SADECE C1'de eklendi - C1'den ONCE acilmis
+        // oturumlarda bulunmaz. Uydurulmus/varsayilan bir kimlikle devam
+        // ETMEK YERINE (gorev talimati) kullanici yeniden giris yapmaya
+        // zorlanir - Cikis sayfasi mevcut cerezi temizler.
+        var kullaniciIdClaim = User.FindFirst("kullanici_id");
+        if (kullaniciIdClaim == null)
+        {
+            return RedirectToPage("/Cikis");
+        }
+        var kullaniciId = long.Parse(kullaniciIdClaim.Value);
+        var rol = User.FindFirst(ClaimTypes.Role)!.Value;
+
         var istemci = new HttpClient();
         var eposta = User.Identity!.Name;
-        var govde = new { soru = Soru, tenant_id = tenant, departman_id = DepartmanId };
+        var govde = new { soru = Soru, tenant_id = tenant, departman_id = DepartmanId, kullanici_id = kullaniciId, rol };
 
         SorguYaniti? sonuc = null;
         try
