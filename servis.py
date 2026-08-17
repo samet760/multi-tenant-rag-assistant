@@ -1,10 +1,14 @@
 import os
 import tempfile
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from sorgu import cevapla
 from indeksle import indeksle
 app = FastAPI()
+
+# migrations/002_erisim_kontrolu.sql'deki CHECK ile AYNI kisitlama - .NET
+# tarafi zaten dogruluyor ama Python bu istege DOGRUDAN guvenmez.
+GECERLI_ERISIM_SEVIYELERI = {"sirket", "departman"}
 
 class SoruIstegi(BaseModel):
     soru: str
@@ -29,14 +33,18 @@ def indeksle_endpoint(
     tenant_id: str = Form(...),
     dosya_adi: str = Form(...),
     departman_id: int = Form(...),
+    erisim_seviyesi: str = Form(...),
     dosya: UploadFile = File(...),
 ):
+    if erisim_seviyesi not in GECERLI_ERISIM_SEVIYELERI:
+        raise HTTPException(status_code=400, detail="Gecersiz erisim_seviyesi")
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as gecici:
         gecici.write(dosya.file.read())
         yol = gecici.name
 
     try:
-        belge_id = indeksle(tenant_id, yol, dosya_adi, departman_id)
+        belge_id = indeksle(tenant_id, yol, dosya_adi, departman_id, erisim_seviyesi)
     finally:
         os.remove(yol)
 

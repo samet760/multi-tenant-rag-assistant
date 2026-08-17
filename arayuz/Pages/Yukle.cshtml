@@ -43,6 +43,15 @@
     </div>
 
     <div class="mb-3">
+        <label class="form-label">Erişim Seviyesi</label>
+        <select asp-for="ErisimSeviyesi" class="form-select" required>
+            <option value="" selected disabled>Erişim seviyesi seçin</option>
+            <option value="sirket">Şirket Geneli</option>
+            <option value="departman">Sadece Departman</option>
+        </select>
+    </div>
+
+    <div class="mb-3">
         <label class="form-label">Dosya</label>
         <input type="file" asp-for="Dosya" class="form-control" id="dosya-girisi" />
     </div>

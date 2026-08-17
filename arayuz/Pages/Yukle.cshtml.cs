@@ -21,6 +21,14 @@ public class YukleModel : PageModel
     [BindProperty]
     public long? DepartmanId { get; set; }
 
+    [BindProperty]
+    public string? ErisimSeviyesi { get; set; }
+
+    // Tarayicidan gelen degere DOGRUDAN guvenilmiyor - sadece bu iki deger
+    // kabul edilir (migrations/002_erisim_kontrolu.sql'deki CHECK ile AYNI
+    // kisitlama, burada FastAPI'ye HIC gitmeden erkenden reddedilir).
+    private static readonly HashSet<string> GecerliErisimSeviyeleri = new() { "sirket", "departman" };
+
     public string? Mesaj { get; set; }
 
     public record Departman(long Id, string Ad);
@@ -81,10 +89,17 @@ public class YukleModel : PageModel
             return;
         }
 
+        if (ErisimSeviyesi == null || !GecerliErisimSeviyeleri.Contains(ErisimSeviyesi))
+        {
+            Mesaj = "Lütfen geçerli bir erişim seviyesi seçin.";
+            return;
+        }
+
         using var icerik = new MultipartFormDataContent();
         icerik.Add(new StringContent(tenant), "tenant_id");
         icerik.Add(new StringContent(Dosya.FileName), "dosya_adi");
         icerik.Add(new StringContent(DepartmanId.Value.ToString()), "departman_id");
+        icerik.Add(new StringContent(ErisimSeviyesi), "erisim_seviyesi");
         icerik.Add(new StreamContent(Dosya.OpenReadStream()), "dosya", "belge.pdf");
 
         var istemci = new HttpClient();
