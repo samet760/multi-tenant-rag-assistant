@@ -71,4 +71,47 @@ public class DepartmanlarModel : PageModel
 
         return RedirectToPage();
     }
+
+    public IActionResult OnPostYenidenAdlandir(long id, string ad)
+    {
+        var tenant = User.FindFirst("tenant_id")!.Value;
+        var yeniAd = (ad ?? "").Trim();
+
+        if (yeniAd.Length == 0)
+        {
+            Hata = "Departman adı boş olamaz.";
+            Yukle();
+            return Page();
+        }
+
+        using var baglanti = Db.Baglan();
+        int etkilenenSatir;
+        try
+        {
+            using var komut = new NpgsqlCommand(
+                "update departmanlar set ad = @ad where id = @id and tenant_id = @t", baglanti);
+            komut.Parameters.AddWithValue("ad", yeniAd);
+            komut.Parameters.AddWithValue("id", id);
+            komut.Parameters.AddWithValue("t", tenant);
+            etkilenenSatir = komut.ExecuteNonQuery();
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            Hata = "Bu isimde bir departman zaten var.";
+            Yukle();
+            return Page();
+        }
+
+        // id + tenant_id BIRLIKTE eslesmediyse (baska tenant'a ait ya da hic
+        // yok) UPDATE 0 satir etkiler - hangisi oldugunu AYIRT ETMEDEN genel
+        // bir hata gosterilir, cross-tenant bilgi SIZDIRILMAZ.
+        if (etkilenenSatir == 0)
+        {
+            Hata = "Departman bulunamadı.";
+            Yukle();
+            return Page();
+        }
+
+        return RedirectToPage();
+    }
 }

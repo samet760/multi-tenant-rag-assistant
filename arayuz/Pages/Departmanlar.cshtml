@@ -23,6 +23,7 @@
     <thead>
         <tr>
             <th>Ad</th>
+            <th></th>
         </tr>
     </thead>
     <tbody>
@@ -30,6 +31,13 @@
         {
             <tr>
                 <td>@d.Ad</td>
+                <td>
+                    <form method="post" asp-page-handler="YenidenAdlandir" class="d-flex gap-2">
+                        <input type="hidden" name="id" value="@d.Id" />
+                        <input type="text" name="ad" value="@d.Ad" class="form-control form-control-sm" style="max-width: 220px;" required />
+                        <button type="submit" class="btn btn-sm btn-secondary">Yeniden adlandır</button>
+                    </form>
+                </td>
             </tr>
         }
     </tbody>
