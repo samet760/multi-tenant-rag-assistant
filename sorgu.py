@@ -67,15 +67,44 @@ def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None):
 
     with psycopg.connect(URL) as baglanti:
         with baglanti.cursor() as imlec:
+            # Yetkilendirme predikati (ADIM C3, bkz. migrations/002_erisim_
+            # kontrolu.sql / PROJECT_MAP.md "Erisim kontrolu"): manuel
+            # secim de, yukarida departman_yonlendir'in bulduğu departman
+            # da AYNI predikate tabi - hangi yoldan geldigine bakilmaksizin
+            # burada uygulanir, ATLANAMAZ.
+            # - erisim_seviyesi IS NULL -> ne 'sirket' ne 'departman' dalina
+            #   uyar, HER ZAMAN reddedilir (varsayilan-kapali).
+            # - 'sirket' -> tenant icindeki HERKESE acik.
+            # - 'departman' + departman_id IS NULL -> reddedilir (ikinci
+            #   AND'de acikca kontrol edilir, ayrica reddedilir).
+            # - 'departman' + departman_id dolu -> yonetici HER departmani
+            #   gorur (membership sorgusu ATLANIR); kullanici SADECE
+            #   kullanici_departmanlari'nda o departmana ACIKCA uyeyse
+            #   gorur (EXISTS alt sorgusu, ek round-trip YOK).
             imlec.execute(
                 """
                 select metin, 1 - (vektor <=> %s::vector) as skor
                 from parcalar
                 where tenant_id = %s and departman_id = %s
+                and (
+                    erisim_seviyesi = 'sirket'
+                    or (
+                        erisim_seviyesi = 'departman'
+                        and departman_id is not null
+                        and (
+                            %s = 'yonetici'
+                            or exists (
+                                select 1 from kullanici_departmanlari kd
+                                where kd.kullanici_id = %s
+                                  and kd.departman_id = parcalar.departman_id
+                            )
+                        )
+                    )
+                )
                 order by vektor <=> %s::vector
                 limit 3
                 """,
-                (soru_str, tenant_id, departman_id, soru_str),
+                (soru_str, tenant_id, departman_id, rol, kullanici_id, soru_str),
             )
             satirlar = imlec.fetchall()
 
