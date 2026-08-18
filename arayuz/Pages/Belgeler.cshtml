@@ -103,14 +103,17 @@
                                 @if (User.IsInRole("yonetici"))
                                 {
                                     <td>
-                                        <form method="post" asp-page-handler="Sil">
-                                            <input type="hidden" name="id" value="@belge.Id" />
-                                            <input type="hidden" name="departmanId" value="@Model.DepartmanId" />
-                                            <button type="submit" class="btn btn-sm btn-danger"
-                                                    onclick="return confirm('@belge.DosyaAdi silinsin mi?');">
-                                                Sil
-                                            </button>
-                                        </form>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <a href="/BelgeDuzenle?id=@belge.Id" class="btn btn-sm btn-outline-secondary">Düzenle</a>
+                                            <form method="post" asp-page-handler="Sil">
+                                                <input type="hidden" name="id" value="@belge.Id" />
+                                                <input type="hidden" name="departmanId" value="@Model.DepartmanId" />
+                                                <button type="submit" class="btn btn-sm btn-danger"
+                                                        onclick="return confirm('@belge.DosyaAdi silinsin mi?');">
+                                                    Sil
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                 }
                             </tr>
