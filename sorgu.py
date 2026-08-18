@@ -1,23 +1,40 @@
 import os
 import psycopg
 from dotenv import load_dotenv
-from llm import sor, YETERSIZ_KANIT_CEVAPLARI
+from llm import sor, YETERSIZ_KANIT_CEVABI, YETERSIZ_KANIT_CEVAPLARI
 from embed import model
 from reranker import reranker_al
 
 load_dotenv()
 URL = os.getenv("SUPABASE_DB_URL")
+# RAG V2 CHECKPOINT 2: RETIRED - ESIK ARTIK production'da cevaplanabilirlik
+# KARARI VERMEZ (bkz. gorev talimati "REMOVE ESIK AS PRODUCTION
+# ANSWERABILITY GATE"). Ham dense benzerlik guvenilir bir evrensel
+# cevaplanabilirlik sinifladirici DEGIL - kanit: bir "Mars" niteleyicili,
+# desteklenmeyen soru ~0.631 gibi YUKSEK bir dense skor alirken, gecerli bir
+# parafraz ~0.538 ile bu esigin ALTINDA kaliyordu. Nihai cevaplanabilirlik
+# karari artik TAMAMEN llm.py'nin deterministik YETERSIZ_KANIT_CEVAPLARI
+# sozlesmesine ait (bkz. asagidaki cevapla()). Bu sabit SILINMEDI - SADECE
+# rag_benchmark.py'de ACIKCA "LEGACY diagnostic only" olarak etiketlenmis,
+# ISTEGE BAGLI bir tarihsel karsilastirma icin KORUNDU; cevapla()'nin
+# HICBIR YERINDE ARTIK OKUNMAZ/KARSILASTIRILMAZ.
 ESIK = 0.54
-# Production'ın final getirme sorgusunun ADAY SAYISI - eskiden SQL icinde
-# "limit 3" olarak gomuluydu, RAG V2 tani checkpoint'i icin
-# final_adaylari_getir'e PARAMETRE olarak tasindi (bkz. asagisi). cevapla()
-# bu SABITI kullanir - deger DEGISMEDI, sadece adi/gorunurlugu var.
-SON_K = 3
 # RAG V2 CHECKPOINT 1: departman_yonlendir'in reranker'a gonderdigi authorized
 # DENSE aday havuzunun genisligi - rag_benchmark.py'nin tani icin kullandigi
 # TANI_TOP_K (10) ile AYNI deger, ayri bir sabit olarak (production/tani
 # birbirinden BAGIMSIZ kalsin diye, bkz. asagidaki departman_yonlendir).
 ROUTER_TOP_K = 10
+# RAG V2 CHECKPOINT 2: routed departman icindeki authorized DENSE aday
+# havuzunun genisligi - reranker'a giden final aday sayisi (bkz. asagidaki
+# final_baglam_sec). Eskiden final getirme SQL'e gomulu "limit 3" (SON_K) ile
+# dogrudan LLM'e giden parcalari cekiyordu - SON_K'nin bu rolu KALDIRILDI,
+# yerini FINAL_ADAY_TOP_K (aday havuzu) + FINAL_BAGLAM_K (nihai kanit) aldi.
+FINAL_ADAY_TOP_K = 10
+# RAG V2 CHECKPOINT 2: reranker siralamasindan SONRA LLM'e giden VE
+# provenance'i belirleyen NIHAI kanit parca sayisi (bkz. gorev talimati
+# "FINAL EVIDENCE"). Eski SON_K=3'un YERINE gecti - deger BILINCLI olarak
+# 3'ten 4'e cikti (gorev talimatinda acikca istendigi gibi).
+FINAL_BAGLAM_K = 4
 
 
 
@@ -80,6 +97,36 @@ def departman_adaylari_getir(tenant_id, soru_str, kullanici_id, rol, limit):
             return imlec.fetchall()
 
 
+def reranker_ile_sirala(soru, ogeler, metin_al):
+    """AYNI aday/oge listesini BAAI/bge-reranker-v2-m3 ile TEK bir batch
+    cagrisinda yeniden siralar - router (departman_yonlendir) VE final
+    getirme (final_baglam_sec) arasinda PAYLASILAN TEK kod (bkz. gorev
+    talimati "tiny shared reranking helper... prevents duplicated ranking
+    code"). rag_benchmark.py de AYNI fonksiyonu tani amacli cagirir - kendi
+    predict()/sort mantigini KOPYALAMAZ.
+
+    metin_al: her ogeden puanlanacak metni cikaran KUCUK bir fonksiyon -
+    cagiranlarin SQL kolon sirasi/veri sekli farkli oldugu icin (departman_
+    adaylari_getir vs final_adaylari_getir vs rag_benchmark.py'nin tani
+    amacli enumerate edilmis ogeleri) bu KASITLI olarak disaridan verilir,
+    burada hicbir SQL/yetkilendirme mantigi YOKTUR - sadece zaten cekilmis
+    (yetkilendirilmis) bir listeyi bellekte yeniden siralar.
+
+    Ogeleri, reranker skoruna gore AZALAN sirada, her biriyle esli skorla
+    birlikte dondurur: [(oge, reranker_skoru), ...]. Mutlak bir esik
+    UYGULANMAZ - SADECE GORECELI siralama (bkz. gorev talimati). Bos liste
+    verilirse bos liste doner - reranker HIC CAGRILMAZ.
+    """
+    if not ogeler:
+        return []
+    cross_encoder = reranker_al()
+    ciftler = [[soru, metin_al(oge)] for oge in ogeler]
+    rerank_skorlari = cross_encoder.predict(ciftler)
+    esli = list(zip(ogeler, (float(s) for s in rerank_skorlari)))
+    esli.sort(key=lambda cift: cift[1], reverse=True)
+    return esli
+
+
 def departman_yonlendir(soru, tenant_id, soru_str, kullanici_id=None, rol=None):
     """Genel Asistan modunda (departman_id verilmemis) soruyu hangi
     departmana yonlendirecegini belirler - LLM'e (sor()/OpenRouter'a)
@@ -126,25 +173,22 @@ def departman_yonlendir(soru, tenant_id, soru_str, kullanici_id=None, rol=None):
     if not adaylar:
         return None, None
 
-    # TEK batch cagrisi - aday basina ayri bir predict() cagrisi YOK.
-    cross_encoder = reranker_al()
-    ciftler = [[soru, aday[4]] for aday in adaylar]
-    rerank_skorlari = cross_encoder.predict(ciftler)
-
-    en_iyi_indeks = max(range(len(adaylar)), key=lambda i: rerank_skorlari[i])
-    en_iyi_aday = adaylar[en_iyi_indeks]
-    return en_iyi_aday[0], float(rerank_skorlari[en_iyi_indeks])
+    # departman_adaylari_getir'in satir sekli: (departman_id, skor, belge_id,
+    # dosya_adi, metin) - metin son eleman (indeks 4).
+    siralanmis = reranker_ile_sirala(soru, adaylar, metin_al=lambda aday: aday[4])
+    en_iyi_aday, en_iyi_skor = siralanmis[0]
+    return en_iyi_aday[0], en_iyi_skor
 
 
 def final_adaylari_getir(tenant_id, departman_id, soru_str, kullanici_id, rol, limit):
-    """Final yetkilendirme-filtreli aday sorgusu - TEK yer, hem cevapla()
-    (limit=SON_K ile, production) HEM rag_benchmark.py (daha genis bir
-    limit'le, TANI amacli) burayi cagirir. WHERE predikati / JOIN / ORDER BY
-    ONCEKI inline sorguyla BIREBIR AYNI metin - SADECE LIMIT parametrik
-    hale getirildi. Boylece iki cagiran ASLA farkli bir yetkilendirme
-    mantigina SESSIZCE SAPAMAZ (bkz. RAG V2 tani checkpoint gorev talimati
-    "Avoid duplicating the production SQL in a way that could silently
-    diverge")."""
+    """Final yetkilendirme-filtreli aday sorgusu - TEK yer, hem final_baglam_
+    sec (limit=FINAL_ADAY_TOP_K ile, production - RAG V2 CHECKPOINT 2'den
+    itibaren reranker'a giden authorized aday havuzu) HEM rag_benchmark.py
+    (tani amacli) burayi cagirir. WHERE predikati / JOIN / ORDER BY ilk
+    halinden BIREBIR AYNI metin - SADECE LIMIT parametrik hale getirildi.
+    Boylece iki cagiran ASLA farkli bir yetkilendirme mantigina SESSIZCE
+    SAPAMAZ (bkz. RAG V2 tani checkpoint gorev talimati "Avoid duplicating
+    the production SQL in a way that could silently diverge")."""
     with psycopg.connect(URL) as baglanti:
         with baglanti.cursor() as imlec:
             # ADIM P2 (kaynak izlenebilirligi): AYNI yetkilendirme-filtreli
@@ -187,6 +231,51 @@ def final_adaylari_getir(tenant_id, departman_id, soru_str, kullanici_id, rol, l
             return imlec.fetchall()
 
 
+def final_baglam_sec(soru, tenant_id, departman_id, soru_str, kullanici_id, rol):
+    """RAG V2 CHECKPOINT 2: routed departman icinde authorized DENSE top-
+    FINAL_ADAY_TOP_K aday cekilir (final_adaylari_getir - AYNI yetkilendirme
+    predikati, DEGISMEDI), reranker_ile_sirala ile YENIDEN siralanir, ilk
+    FINAL_BAGLAM_K parca NIHAI KANIT olarak secilir.
+
+    Bu liste, hem LLM'e giden BAGLAM hem provenance'in TEK KAYNAGIDIR (bkz.
+    gorev talimati "PROVENANCE - CRITICAL") - baska HICBIR asamadan (router
+    adaylari, final dense top-10'un reranker'da kaybeden geri kalani, esik
+    altinda kalan herhangi bir aday) kaynak/baglam TURETILMEZ.
+
+    TEKILLESTIRME YAPILMAZ - ayni belgeden birden fazla parca tamamlayici
+    olabilir (bkz. gorev talimati "FINAL EVIDENCE"), ikisi de secilebilir;
+    dense siralama DEGIL, reranker sirasi KORUNUR (provenance'in kendi
+    tekillestirmesi SONRADAN, cevapla() icinde, belge_id'ye gore ayrica
+    yapilir - bu SADECE goruntuleme icindir, LLM'e giden 'secilen' listesini
+    ETKILEMEZ).
+
+    DONER: (final_kanit, dense_top_skor).
+    - final_kanit: final_adaylari_getir'in kendi satir sekliyle (metin,
+      dense_skor, belge_id, dosya_adi), reranker sirasina gore, ilk
+      FINAL_BAGLAM_K (daha az aday varsa hepsi).
+    - dense_top_skor: authorized aday havuzunun EN YUKSEK dense (cosine)
+      skoru - ESKI ESIK karsilastirmasinin kullandigi AYNI deger
+      (adaylar[0][1], final_adaylari_getir zaten dense ORDER BY ile
+      donuyor). ARTIK HICBIR KARARI ETKILEMEZ - SADECE cevapla()'nin donus
+      degerindeki 'skor' alaninin ESKI, geriye-donuk-uyumlu anlamini
+      korumak icin tasinir (bkz. gorev talimati "PRESERVE /sor CONTRACT").
+
+    Hic authorized aday yoksa ([], 0) doner - cagiran bunu MEVCUT "bilgi
+    yok" davranisiyla ele alir, reranker bu durumda HIC CAGRILMAZ.
+    """
+    adaylar = final_adaylari_getir(tenant_id, departman_id, soru_str, kullanici_id, rol, FINAL_ADAY_TOP_K)
+    if not adaylar:
+        return [], 0
+
+    dense_top_skor = adaylar[0][1]
+
+    # final_adaylari_getir'in satir sekli: (metin, skor, belge_id,
+    # dosya_adi) - metin ilk eleman (indeks 0).
+    siralanmis = reranker_ile_sirala(soru, adaylar, metin_al=lambda aday: aday[0])
+    final_kanit = [aday for aday, _rerank_skoru in siralanmis[:FINAL_BAGLAM_K]]
+    return final_kanit, dense_top_skor
+
+
 def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None):
     # kullanici_id / rol: servis.py'den gelen GUVENILIR .NET kimligi - hem
     # departman_yonlendir (ADIM C4) hem asagidaki asil getirme (ADIM C3)
@@ -211,59 +300,57 @@ def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None):
         # DOGRUDAN cagirarak bu skoru gorebilir, cevapla() burada yoksayar.
         departman_id, _router_skoru = departman_yonlendir(soru, tenant_id, soru_str, kullanici_id, rol)
         if departman_id is None:
-            return "Bu bilgi dokümanlarda yer almıyor.", 0, None, []
+            return YETERSIZ_KANIT_CEVABI, 0, None, []
 
-    # Yetkilendirme predikati (ADIM C3, bkz. migrations/002_erisim_
-    # kontrolu.sql / PROJECT_MAP.md "Erisim kontrolu"): manuel secim de,
-    # yukarida departman_yonlendir'in bulduğu departman da AYNI predikate
-    # tabi - hangi yoldan geldigine bakilmaksizin final_adaylari_getir
-    # icinde uygulanir, ATLANAMAZ.
-    # - erisim_seviyesi IS NULL -> ne 'sirket' ne 'departman' dalina uyar,
-    #   HER ZAMAN reddedilir (varsayilan-kapali).
-    # - 'sirket' -> tenant icindeki HERKESE acik.
-    # - 'departman' + departman_id IS NULL -> reddedilir.
-    # - 'departman' + departman_id dolu -> yonetici HER departmani gorur
-    #   (membership sorgusu ATLANIR); kullanici SADECE kullanici_
-    #   departmanlari'nda o departmana ACIKCA uyeyse gorur.
-    satirlar = final_adaylari_getir(tenant_id, departman_id, soru_str, kullanici_id, rol, SON_K)
+    # RAG V2 CHECKPOINT 2: final_baglam_sec, ROUTED departman icindeki
+    # yetkilendirme predikatini (final_adaylari_getir icinde, DEGISMEDI)
+    # HER ZAMAN reranker'dan ONCE uygular, sonra authorized dense top-
+    # FINAL_ADAY_TOP_K'yi reranker ile yeniden siralayip ilk FINAL_BAGLAM_K
+    # parcayi NIHAI KANIT olarak dondurur (bkz. final_baglam_sec docstring'i
+    # - "PROVENANCE - CRITICAL" notu). ESIK ARTIK burada KARSILASTIRILMAZ.
+    final_kanit, dense_top_skor = final_baglam_sec(soru, tenant_id, departman_id, soru_str, kullanici_id, rol)
 
-    # departman_id BURADA HER ZAMAN dolu (elle secilmis ya da yukarida
-    # yonlendirilmis) - fonksiyon hangi departmanda arandigini HER YANITTA
-    # geri bildirir; bu SADECE raporlama, retrieval/esik/LLM akisi degismedi.
-    if not satirlar or satirlar[0][1] < ESIK:
-        en_iyi = satirlar[0][1] if satirlar else 0
-        # Esik altinda kalan/hic satir donmeyen aday parcalar LLM'e HIC
-        # VERILMEDI - kaynaklar BOS doner, esigi gecemeyen bir belge "kaynak"
-        # olarak GOSTERILMEZ.
-        return "Bu bilgi dokümanlarda yer almıyor.", en_iyi, departman_id, []
+    if not final_kanit:
+        # Routed departmanda HICBIR yetkili aday yok - guvenli "bilgi yok"
+        # yolu, LLM HIC CAGRILMAZ (verilecek baglam yok). Eskiden bu ESIK'in
+        # "0 satir" dali ile AYNI davranistı - sadece artik "esik altinda
+        # kaldi" nedeni YOK, sadece "aday hic yok" nedeni var.
+        return YETERSIZ_KANIT_CEVABI, dense_top_skor, departman_id, []
 
-    secilen = [s[0] for s in satirlar]
+    # secilen: reranker SIRASINDA, TEKILLESTIRME OLMADAN - ayni belgeden
+    # birden fazla parca gelmisse (tamamlayici olabilir, bkz. gorev talimati
+    # "FINAL EVIDENCE") HEPSI LLM'e gider.
+    secilen = [aday[0] for aday in final_kanit]
     cevap_metni = sor(soru, secilen)
 
-    # LLM'in KENDISI, ESIK'i gecmis baglamin soruyu YETERSIZ karsiladigina
+    # LLM'in KENDISI, sunulan NIHAI kanidin soruyu YETERSIZ karsiladigina
     # karar verebilir (bkz. llm.py rule 2/3 + YETERSIZ_KANIT_CEVAPLARI - bu
     # sabit kume, LLM'in SISTEM promptunda HARFIYEN uretmeye ZORLANDIGI iki
-    # cumleyle BIREBIR AYNI, tek kaynaktan gelir). Bu durumda baglam retrieval
-    # asamasinda "yeterli" gorunse bile CEVAPTA GERCEKTEN KULLANILMADI - UI'da
-    # "Kaynaklar: X.pdf" gosterip hemen altinda "yeterli bilgi yok" demek
-    # YANILTICI olurdu, o yuzden kaynaklar da BOS doner. Kontrol TAM ESITLIK -
-    # fuzzy bir substring/regex TAHMINI DEGIL (bkz. gorev talimati).
+    # cumleyle BIREBIR AYNI, tek kaynaktan gelir). Bu durumda kaynaklar da
+    # BOS doner - UI'da "Kaynaklar: X.pdf" gosterip hemen altinda "yeterli
+    # bilgi yok" demek YANILTICI olurdu. Kontrol TAM ESITLIK - fuzzy bir
+    # substring/regex TAHMINI DEGIL (bkz. gorev talimati).
     if cevap_metni in YETERSIZ_KANIT_CEVAPLARI:
-        return cevap_metni, satirlar[0][1], departman_id, []
+        return cevap_metni, dense_top_skor, departman_id, []
 
-    # Kaynaklar SADECE LLM'e verilen (secilen) parcalarin belgelerinden
-    # olusur, ilk-gorulme sirasi korunarak belge_id'ye gore TEKILLESTIRILIR -
-    # ayni belgeden birden fazla parca gelmisse (sik durum, bkz. PROJECT_MAP.md
-    # "Top-K provenance semantics") tek bir kaynak satiri olarak gorunur.
+    # Kaynaklar SADECE final_kanit'in (LLM'e VERILEN, reranker sirali NIHAI
+    # kanit) belgelerinden olusur - baska HICBIR aday havuzundan (router,
+    # dense top-10'un reranker'da kaybeden geri kalani) provenance
+    # TURETILMEZ. Ilk-gorulme sirasi korunarak belge_id'ye gore
+    # TEKILLESTIRILIR - ayni belgeden birden fazla parca gelmisse
+    # (bkz. PROJECT_MAP.md "Top-K provenance semantics") tek bir kaynak
+    # satiri olarak gorunur. Bu tekillestirme SADECE goruntuleme icindir -
+    # LLM'e giden 'secilen' listesi (yukarida) TEKILLESTIRILMEMISTI.
     kaynaklar = []
     gorulen_belgeler = set()
-    for _, _, belge_id, dosya_adi in satirlar:
+    for aday in final_kanit:
+        belge_id, dosya_adi = aday[2], aday[3]
         if belge_id in gorulen_belgeler:
             continue
         gorulen_belgeler.add(belge_id)
         kaynaklar.append({"belge_id": belge_id, "dosya_adi": dosya_adi})
 
-    return cevap_metni, satirlar[0][1], departman_id, kaynaklar
+    return cevap_metni, dense_top_skor, departman_id, kaynaklar
 
 
 
