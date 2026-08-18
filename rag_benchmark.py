@@ -242,8 +242,15 @@ def calistir(
     soru_v = model.encode(soru, normalize_embeddings=True)
     soru_str = str(soru_v.tolist())
 
+    # RAG V2 CHECKPOINT 1: departman_yonlendir artik PRODUCTION icinde de
+    # reranker kullaniyor (bkz. sorgu.py) - bu yuzden bu cagri, --rerank
+    # bayragindan BAGIMSIZ olarak, HER ZAMAN reranker'i bir kez tetikler
+    # (production'in GERCEK davranisini yansitmak icin BILINCLI - bu satir
+    # artik "dense kazanan" DEGIL, "production'in sececegi kazanan"i
+    # gosterir). Asagidaki ayri --rerank blogu ise TUM top-10'un reranker
+    # siralamasini/karsilastirmasini GORMEK icindir, sadece kazanani DEGIL.
     departman_id, router_skoru = departman_yonlendir(
-        profil.tenant_id, soru_str, profil.kullanici_id, profil.rol
+        soru, profil.tenant_id, soru_str, profil.kullanici_id, profil.rol
     )
 
     sonuc = BenchmarkSonucu(

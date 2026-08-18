@@ -3,6 +3,7 @@ import psycopg
 from dotenv import load_dotenv
 from llm import sor
 from embed import model
+from reranker import reranker_al
 
 load_dotenv()
 URL = os.getenv("SUPABASE_DB_URL")
@@ -12,17 +13,23 @@ ESIK = 0.54
 # final_adaylari_getir'e PARAMETRE olarak tasindi (bkz. asagisi). cevapla()
 # bu SABITI kullanir - deger DEGISMEDI, sadece adi/gorunurlugu var.
 SON_K = 3
+# RAG V2 CHECKPOINT 1: departman_yonlendir'in reranker'a gonderdigi authorized
+# DENSE aday havuzunun genisligi - rag_benchmark.py'nin tani icin kullandigi
+# TANI_TOP_K (10) ile AYNI deger, ayri bir sabit olarak (production/tani
+# birbirinden BAGIMSIZ kalsin diye, bkz. asagidaki departman_yonlendir).
+ROUTER_TOP_K = 10
 
 
 
 def departman_adaylari_getir(tenant_id, soru_str, kullanici_id, rol, limit):
     """Yonlendirme icin yetkilendirme-filtreli ADAY sorgusu - TEK yer, hem
-    departman_yonlendir (limit=1 ile, production) HEM rag_benchmark.py
-    (daha genis bir limit'le, TANI amacli) burayi cagirir. WHERE predikati /
-    ORDER BY, departman_yonlendir'in ONCEKI inline sorgusuyla BIREBIR AYNI
-    metin - SADECE LIMIT parametrik hale getirildi. Boylece iki cagiran ASLA
-    farkli bir yetkilendirme mantigina SESSIZCE SAPAMAZ (final_adaylari_
-    getir icin zaten kurulan AYNI desen, bkz. asagisi).
+    departman_yonlendir (limit=ROUTER_TOP_K ile, production - RAG V2
+    CHECKPOINT 1'den itibaren reranker'a giden authorized aday havuzu) HEM
+    rag_benchmark.py (tani amacli) burayi cagirir. WHERE predikati / ORDER
+    BY, ilk halinden BIREBIR AYNI metin - SADECE LIMIT parametrik hale
+    getirildi. Boylece iki cagiran ASLA farkli bir yetkilendirme mantigina
+    SESSIZCE SAPAMAZ (final_adaylari_getir icin zaten kurulan AYNI desen,
+    bkz. asagisi).
 
     Tani icin belge_id/dosya_adi/metin de SELECT edilir - final_adaylari_
     getir'deki AYNI JOIN deseniyle (b.id = p.belge_id AND b.tenant_id = %s):
@@ -73,37 +80,60 @@ def departman_adaylari_getir(tenant_id, soru_str, kullanici_id, rol, limit):
             return imlec.fetchall()
 
 
-def departman_yonlendir(tenant_id, soru_str, kullanici_id=None, rol=None):
+def departman_yonlendir(soru, tenant_id, soru_str, kullanici_id=None, rol=None):
     """Genel Asistan modunda (departman_id verilmemis) soruyu hangi
-    departmana yonlendirecegini, TENANT'in kendi indekslenmis bilgisinden
-    (embedding benzerligi) belirler - LLM'e SORULMAZ, departman adi/ID'si
-    hiçbir yerde hardcode EDILMEZ. En yakin, departman_id'si dolu (IS NOT
-    NULL) TEK parcayi bulur - departman_id'si hic atanmamis (NULL) eski
-    parcalar bu yonlendirme aramasina hic girmez. Hic sonuc yoksa (tenant'in
-    hic departman-etiketli parcasi yoksa) (None, None) doner, cagiran "bilgi
-    yok" olarak ele alir.
+    departmana yonlendirecegini belirler - LLM'e (sor()/OpenRouter'a)
+    SORULMAZ, departman adi/ID'si hiçbir yerde hardcode EDILMEZ.
 
-    DONER: (departman_id, skor) ikilisi - RAG V2 tani checkpoint'i icin
-    router'in KENDI guven skorunu da gorunur kilmak amaciyla eklendi (bkz.
-    rag_benchmark.py). cevapla() production akisinda skoru KULLANMAZ/
-    yoksayar - davranis DEGISMEDI, sadece artik cagiran tarafta GORULEBILIR.
+    RAG V2 CHECKPOINT 1: yonlendirme artik SADECE dense top-1 DEGIL, iki
+    asamali:
+      1) departman_adaylari_getir ile authorized DENSE top-ROUTER_TOP_K aday
+         cekilir (AYNI yetkilendirme predikati, WHERE icinde, ORDER BY/LIMIT
+         'tan ONCE - bkz. asagidaki "Guvenlik" notu).
+      2) Bu adaylarin metni, BAAI/bge-reranker-v2-m3 (bkz. reranker.py) ile
+         soru'ya karsi TEK bir batch cagrisinda yeniden puanlanir; EN YUKSEK
+         reranker skoruna sahip adayin departmani KAZANIR.
+    Boylece dense top-1'in yanlis departmani sectigi (ama dogru parcanin
+    dense top-10 icinde zaten var oldugu) durumlarda, reranker dogru
+    departmani ONE CIKARABILIR - bkz. RAG V2 benchmark kaniti (rag_
+    benchmark.py --rerank ile dogrulandi).
 
-    ARTIK departman_adaylari_getir(..., limit=1) cagirip ILK satiri
-    kullanir - SORGU METNI/WHERE/ORDER BY DEGISMEDI (sadece paylasilan
-    yardimci fonksiyona TASINDI), limit=1 ONCEKI "limit 1" ile BIREBIR AYNI
-    deger - kazanan (en yakin yetkili parcanin departmani) HER ZAMAN aynen
-    ONCEKI gibi secilir, davranis byte-for-byte AYNI kalir.
+    Hic aday yoksa (tenant'in hic yetkili departman-etiketli parcasi yoksa)
+    (None, None) doner - MEVCUT "hic departman bulunamadi" davranisi
+    AYNEN korunur, reranker bu durumda HIC CAGRILMAZ.
 
-    kullanici_id / rol: ADIM C4 - yukaridaki sorgu, C3'teki asil getirme
-    sorgusuyla AYNI yetkilendirme predikatini uygular (bkz. migrations/
-    002_erisim_kontrolu.sql / PROJECT_MAP.md "Erisim kontrolu"). Yetkisiz
-    bir parca ARTIK yonlendirme adayi bile olamaz - hangi departmana
-    yonlendirilecegini SEC-ME asamasinda elenir, sadece sonradan gizlenmez.
+    DONER: (departman_id, reranker_skoru) - ikinci deger ARTIK dense skor
+    DEGIL, kazanan adayin reranker alaka skoru (routing kararini gercekten
+    ACIKLAYAN skor budur). cevapla() bu degeri KULLANMAZ/yoksayar (mevcut
+    davranis DEGISMEDI), sadece raporlama/tani icin GORULEBILIR. Mutlak bir
+    esik burada UYDURULMAZ - reranker SADECE aday havuzu icinde GORECELI
+    siralama icin kullanilir (bkz. gorev talimati).
+
+    GUVENLIK: reranker'a giden HICBIR aday, departman_adaylari_getir'in
+    WHERE'inde uygulanan tenant/erisim_seviyesi/departman_id/kullanici_
+    departmanlari predikatini ATLAMAZ - yetkilendirme HER ZAMAN reranker'dan
+    ONCE, SQL'in kendisinde tamamlanir (bkz. migrations/002_erisim_
+    kontrolu.sql / PROJECT_MAP.md "Erisim kontrolu"). Reranker sadece ZATEN
+    yetkilendirilmis bir listeyi YENIDEN SIRALAR, yeni satir EKLEMEZ/
+    filtrelemeyi GEVSETMEZ.
+
+    MODEL YASAM DONGUSU: reranker_al() tembel tekil (bkz. reranker.py) -
+    ilk /sor istegi modeli yukler, sonraki HER istek (bu FastAPI/uvicorn
+    surecinin omru boyunca) AYNI yuklu ornegi yeniden kullanir, istek
+    basina YENIDEN YUKLEME OLMAZ.
     """
-    adaylar = departman_adaylari_getir(tenant_id, soru_str, kullanici_id, rol, 1)
+    adaylar = departman_adaylari_getir(tenant_id, soru_str, kullanici_id, rol, ROUTER_TOP_K)
     if not adaylar:
         return None, None
-    return adaylar[0][0], adaylar[0][1]
+
+    # TEK batch cagrisi - aday basina ayri bir predict() cagrisi YOK.
+    cross_encoder = reranker_al()
+    ciftler = [[soru, aday[4]] for aday in adaylar]
+    rerank_skorlari = cross_encoder.predict(ciftler)
+
+    en_iyi_indeks = max(range(len(adaylar)), key=lambda i: rerank_skorlari[i])
+    en_iyi_aday = adaylar[en_iyi_indeks]
+    return en_iyi_aday[0], float(rerank_skorlari[en_iyi_indeks])
 
 
 def final_adaylari_getir(tenant_id, departman_id, soru_str, kullanici_id, rol, limit):
@@ -176,10 +206,10 @@ def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None):
         # basarisiz, gosterilecek departman adi yok" olarak okur. Dorduncu
         # deger (kaynaklar) BOS - hicbir parca LLM'e verilmedi, yonlendirme
         # adaylari kaynak SAYILMAZ (bkz. ADIM P2 "Guvenlik" notu).
-        # Router'in kendi skoru (_router_skoru) production akisinda
-        # KULLANILMAZ - sadece rag_benchmark.py::departman_yonlendir'i
+        # Router'in kendi (reranker) skoru (_router_skoru) production
+        # akisinda KULLANILMAZ - sadece rag_benchmark.py::departman_yonlendir'i
         # DOGRUDAN cagirarak bu skoru gorebilir, cevapla() burada yoksayar.
-        departman_id, _router_skoru = departman_yonlendir(tenant_id, soru_str, kullanici_id, rol)
+        departman_id, _router_skoru = departman_yonlendir(soru, tenant_id, soru_str, kullanici_id, rol)
         if departman_id is None:
             return "Bu bilgi dokümanlarda yer almıyor.", 0, None, []
 
