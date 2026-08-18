@@ -29,9 +29,18 @@ SADECE LIMIT parametrik hale getirildi ve departman_yonlendir artik bu
 fonksiyonu limit=1 ile cagirip ilk satiri donduruyor (davranis DEGISMEDI,
 kazanan HER ZAMAN aynen ONCEKI gibi secilir - bkz. sorgu.py docstring'i).
 
+RERANKER SPIKE (--rerank): BAAI/bge-reranker-v2-m3 (bkz. reranker.py) ile
+router'in ZATEN yetkilendirme-filtreli top-10 adayini (departman_adaylari_
+getir'den gelen AYNI satirlar - ikinci bir SQL/sorgu YOK) yeniden siralar.
+SADECE tani/deney amacli - departman_yonlendir'in production kararini
+DEGISTIRMEZ, sadece AYNI aday havuzunu farkli bir sinyalle (cross-encoder
+alaka skoru) nasil siralayacagini GOSTERIR. Mutlak bir esik UYDURULMADI -
+sadece GORECELI siralama karsilastirilir (bkz. gorev talimati).
+
 Kullanim (elle, CLI):
     python rag_benchmark.py --eposta test2@gmail.com
     python rag_benchmark.py --eposta test2@gmail.com --soru "magaza kac saat acik"
+    python rag_benchmark.py --eposta test2@gmail.com --soru "magaza kac saat acik" --rerank
 """
 
 import argparse
@@ -44,6 +53,7 @@ import psycopg
 from dotenv import load_dotenv
 
 from embed import model
+from reranker import reranker_al
 from sorgu import (
     ESIK,
     SON_K,
@@ -105,6 +115,19 @@ class DepartmanOzeti:
 
 
 @dataclass
+class RerankAdayi:
+    rerank_rank: int
+    rerank_skoru: float
+    dense_rank: int
+    dense_skor: float
+    departman_id: int
+    departman_adi: Optional[str]
+    belge_id: int
+    dosya_adi: str
+    metin_onizleme: str
+
+
+@dataclass
 class BenchmarkSonucu:
     soru: str
     profil_adi: str
@@ -132,6 +155,16 @@ class BenchmarkSonucu:
     mevcut_llm_baglam_parcalari: list = field(default_factory=list)
     mevcut_provenance_belgeleri: list = field(default_factory=list)
     cevap: Optional[str] = None
+    # RERANKER SPIKE: sadece --rerank ile doldurulur. Router'in AYNI
+    # yetkilendirme-filtreli top-10'unu (router_top10 ile AYNI SQL sonucu)
+    # cross-encoder alaka skoruna gore YENIDEN siralar - dense sira/skoru da
+    # HER satirda korunur (karsilastirma icin). Kazanan, rerank_top10[0]'in
+    # departmanidir - SADECE goruntuleme/tani, departman_yonlendir'in
+    # production kararini DEGISTIRMEZ.
+    rerank_top10: list = field(default_factory=list)
+    rerank_yukleme_sn: Optional[float] = None
+    rerank_skorlama_sn: Optional[float] = None
+    rerank_hatasi: Optional[str] = None
     sure_sn: float = 0.0
 
 
@@ -191,13 +224,19 @@ def _departman_adlari(tenant_id: str, departman_idler) -> dict:
             return {satir[0]: satir[1] for satir in imlec.fetchall()}
 
 
-def calistir(soru: str, profil: TestProfili, cevap_uret: bool = False) -> BenchmarkSonucu:
+def calistir(
+    soru: str, profil: TestProfili, cevap_uret: bool = False, rerank: bool = False
+) -> BenchmarkSonucu:
     """TEK giris noktasi: sorgu.py::departman_yonlendir + sorgu.py::
     final_adaylari_getir'i HIC DEGISTIRMEDEN, sadece daha genis bir LIMIT
     ile cagirir - kendi SQL'ini ASLA yazmaz. cevap_uret=True verilirse,
     AYRICA production cevapla()'yi (gercek LLM cevabi icin) de cagirir -
     varsayilan False, boylece gunluk tani calistirmalari OpenRouter'a istek
-    ATMAZ/ucret DOGURMAZ; router+retrieval tanisi icin buna gerek yok."""
+    ATMAZ/ucret DOGURMAZ; router+retrieval tanisi icin buna gerek yok.
+    rerank=True verilirse, ZATEN cekilmis (yetkilendirme-filtreli) router
+    adaylarini - ikinci bir SQL sorgusu ATMADAN - BAAI/bge-reranker-v2-m3
+    ile yeniden siralar (bkz. reranker.py). Varsayilan False - agir model
+    yuklemesi/skorlama SADECE acikca istenince calisir."""
     basla = time.time()
 
     soru_v = model.encode(soru, normalize_embeddings=True)
@@ -250,6 +289,55 @@ def calistir(soru: str, profil: TestProfili, cevap_uret: bool = False) -> Benchm
             else:
                 ozet_by_dep[r_dep_id].aday_sayisi += 1
         sonuc.router_departman_ozet = list(ozet_by_dep.values())
+
+        # RERANKER SPIKE: router_adaylari (yukaridaki AYNI, yetkilendirme-
+        # filtreli satirlar - ikinci bir SQL YOK) BAAI/bge-reranker-v2-m3
+        # ile yeniden siralanir. Dense sira/skoru da HER adayda korunur -
+        # sadece GORECELI karsilastirma icin, mutlak bir esik UYDURULMAZ
+        # (bkz. gorev talimati). Model model.encode gibi TEMBEL/tekil
+        # yuklenir (reranker_al) - bu cagrida ilk kez yukleniyorsa
+        # rerank_yukleme_sn > 0 olur, sonraki cagrilarda ~0'a yakin kalir.
+        if rerank:
+            try:
+                yukleme_basla = time.time()
+                cross_encoder = reranker_al()
+                sonuc.rerank_yukleme_sn = round(time.time() - yukleme_basla, 2)
+
+                ciftler = [[soru, r[4]] for r in router_adaylari]
+                skorlama_basla = time.time()
+                rerank_skorlari = cross_encoder.predict(ciftler)
+                sonuc.rerank_skorlama_sn = round(time.time() - skorlama_basla, 2)
+
+                gecici = []
+                for dense_rank, ((r_dep_id, r_skor, r_belge_id, r_dosya_adi, r_metin), r_rerank_skor) in enumerate(
+                    zip(router_adaylari, rerank_skorlari), start=1
+                ):
+                    gecici.append(
+                        RerankAdayi(
+                            rerank_rank=0,  # asagida siralamadan SONRA doldurulur
+                            rerank_skoru=float(r_rerank_skor),
+                            dense_rank=dense_rank,
+                            dense_skor=r_skor,
+                            departman_id=r_dep_id,
+                            departman_adi=dep_adlari.get(r_dep_id),
+                            belge_id=r_belge_id,
+                            dosya_adi=r_dosya_adi,
+                            metin_onizleme=r_metin[:120],
+                        )
+                    )
+
+                # SADECE GORECELI siralama - mutlak bir "kabul/red" esigi
+                # BURADA UYDURULMAZ (bkz. gorev talimati).
+                gecici.sort(key=lambda a: a.rerank_skoru, reverse=True)
+                for i, aday in enumerate(gecici, start=1):
+                    aday.rerank_rank = i
+                sonuc.rerank_top10 = gecici
+            except Exception as hata:
+                # Model yuklenemedi/calisamadi - benchmark'in geri kalanini
+                # (router/final retrieval tanisi) YIKMAZ, sadece bu bolumu
+                # atlar ve hatayi raporlar (bkz. gorev talimati "FAILURE
+                # HANDLING").
+                sonuc.rerank_hatasi = f"{type(hata).__name__}: {hata}"
 
     if departman_id is not None:
         satirlar = final_adaylari_getir(
@@ -318,6 +406,28 @@ def yazdir(sonuc: BenchmarkSonucu) -> None:
     else:
         print("      (yok)")
 
+    # RERANKER SPIKE (--rerank ile doldurulur) - SADECE tani/deney amacli,
+    # departman_yonlendir'in production kararini ETKILEMEZ (bkz. gorev
+    # talimati "IMPORTANT").
+    if sonuc.rerank_hatasi:
+        print(f"    RERANKER HATASI: {sonuc.rerank_hatasi}")
+    elif sonuc.rerank_top10:
+        print("\n    RERANKER ROUTER TOP 10")
+        for a in sonuc.rerank_top10:
+            print(
+                f"      {a.rerank_rank:2d}. rerank_skoru={a.rerank_skoru:.4f}  "
+                f"dense(rank={a.dense_rank}, skor={a.dense_skor:.3f})  "
+                f"dep={a.departman_adi or '?'}(id={a.departman_id})  "
+                f"belge_id={a.belge_id}  {a.dosya_adi}  | {a.metin_onizleme}..."
+            )
+        kazanan = sonuc.rerank_top10[0]
+        print("\n    RERANKER DEPARTMENT WINNER")
+        print(f"      {kazanan.departman_adi or '?'} (id={kazanan.departman_id})")
+        print(
+            f"    rerank yukleme suresi : {sonuc.rerank_yukleme_sn} sn  |  "
+            f"skorlama suresi (top-{TANI_TOP_K}): {sonuc.rerank_skorlama_sn} sn"
+        )
+
     # 4. Mevcut (production) final getirme - ESIK karari + LLM baglami/
     # provenance + tani icin genisletilmis top-10.
     print(f"    [4] ESIK={ESIK}, SON_K={SON_K} -> {'KABUL' if sonuc.esik_kabul_etti else 'RED'} (en iyi skor={sonuc.top_skor:.3f})")
@@ -376,12 +486,20 @@ if __name__ == "__main__":
         "--cevap-uret", action="store_true",
         help="Ayrica gercek LLM cevabini da uret (OpenRouter'a istek atar, varsayilan KAPALI).",
     )
+    ayristirici.add_argument(
+        "--rerank", action="store_true",
+        help="Router'in yetkilendirme-filtreli top-10'unu BAAI/bge-reranker-v2-m3 "
+             "ile de yeniden sirala (tani amacli, production kararini DEGISTIRMEZ). "
+             "Varsayilan KAPALI - model yuklemesi agir/yavas olabilir.",
+    )
     args = ayristirici.parse_args()
 
     profil = profil_coz(args.eposta)
     if profil is None:
         print(f"'{args.eposta}' icin kullanicilar tablosunda kayit bulunamadi.")
     else:
+        toplam_basla = time.time()
         sorular = [args.soru] if args.soru else PROBLAR
         for soru in sorular:
-            yazdir(calistir(soru, profil, cevap_uret=args.cevap_uret))
+            yazdir(calistir(soru, profil, cevap_uret=args.cevap_uret, rerank=args.rerank))
+        print(f"\n=== toplam benchmark suresi: {round(time.time() - toplam_basla, 2)} sn ({len(sorular)} soru) ===")
