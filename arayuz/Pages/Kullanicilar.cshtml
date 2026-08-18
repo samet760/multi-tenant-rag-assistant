@@ -27,24 +27,27 @@
                     }
                 </td>
                 <td>
-                    @if (User.Identity!.Name == k.Eposta)
-                    {
-                        <span>(siz)</span>
-                    }
-                    else if (k.Rol == "kullanici")
-                    {
-                        <form method="post" asp-page-handler="Yukselt">
-                            <input type="hidden" name="id" value="@k.Id" />
-                            <button type="submit" class="btn btn-sm btn-primary">Yönetici yap</button>
-                        </form>
-                    }
-                    else if (k.Rol == "yonetici" && Model.Sahip)
-                    {
-                        <form method="post" asp-page-handler="Dusur">
-                            <input type="hidden" name="id" value="@k.Id" />
-                            <button type="submit" class="btn btn-sm btn-warning">Yetkiyi al</button>
-                        </form>
-                    }
+                    <div class="d-flex align-items-center gap-1">
+                        @if (User.Identity!.Name == k.Eposta)
+                        {
+                            <span>(siz)</span>
+                        }
+                        else if (k.Rol == "kullanici")
+                        {
+                            <form method="post" asp-page-handler="Yukselt">
+                                <input type="hidden" name="id" value="@k.Id" />
+                                <button type="submit" class="btn btn-sm btn-primary">Yönetici yap</button>
+                            </form>
+                        }
+                        else if (k.Rol == "yonetici" && Model.Sahip)
+                        {
+                            <form method="post" asp-page-handler="Dusur">
+                                <input type="hidden" name="id" value="@k.Id" />
+                                <button type="submit" class="btn btn-sm btn-warning">Yetkiyi al</button>
+                            </form>
+                        }
+                        <a href="/KullaniciDepartmanlari?kullaniciId=@k.Id" class="btn btn-sm btn-outline-secondary">Departman Yetkileri</a>
+                    </div>
                 </td>
             </tr>
         }

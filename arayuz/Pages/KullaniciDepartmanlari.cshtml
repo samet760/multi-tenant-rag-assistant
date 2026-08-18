@@ -1,0 +1,74 @@
+@page
+@model arayuz.Pages.KullaniciDepartmanlariModel
+@{
+    ViewData["Title"] = "Departman Yetkileri";
+}
+
+<p><a href="/Kullanicilar">&larr; Kullanıcılara dön</a></p>
+
+@if (!Model.Bulundu)
+{
+    <div class="alert alert-danger">@Model.Hata</div>
+}
+else
+{
+    <h2>Departman Yetkileri</h2>
+    <p class="text-muted">@Model.Eposta (@Model.Rol)</p>
+
+    @if (Model.Rol == "yonetici")
+    {
+        <div class="alert alert-info">Yönetici kullanıcılar tüm departman bilgilerine erişebilir.</div>
+    }
+    else if (Model.Departmanlar.Count == 0)
+    {
+        <p>Bu firmada henüz departman yok.</p>
+    }
+    else
+    {
+        <table class="table" style="max-width:500px">
+            <thead>
+                <tr>
+                    <th>Departman</th>
+                    <th>Üyelik</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var d in Model.Departmanlar)
+                {
+                    <tr>
+                        <td>@d.Ad</td>
+                        <td>
+                            @if (d.Uye)
+                            {
+                                <span class="badge bg-success">Üye</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Üye değil</span>
+                            }
+                        </td>
+                        <td>
+                            @if (d.Uye)
+                            {
+                                <form method="post" asp-page-handler="Al">
+                                    <input type="hidden" name="kullaniciId" value="@Model.KullaniciId" />
+                                    <input type="hidden" name="departmanId" value="@d.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Kaldır</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form method="post" asp-page-handler="Ver">
+                                    <input type="hidden" name="kullaniciId" value="@Model.KullaniciId" />
+                                    <input type="hidden" name="departmanId" value="@d.Id" />
+                                    <button type="submit" class="btn btn-sm btn-primary">Yetki ver</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
