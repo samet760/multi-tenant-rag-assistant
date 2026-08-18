@@ -33,10 +33,14 @@ def sor_endpoint(istek: SoruIstegi):
     # departman_id: HANGI departmanda arandigi (elle secilmis ya da Genel
     # Asistan'in yonlendirdigi) - .NET tarafi bunu SADECE gorsel etiket icin
     # kullanir (bkz. Index.cshtml.cs), retrieval/skor/cevap akisini etkilemez.
-    cevap, skor, departman_id = cevapla(
+    # kaynaklar: sadece LLM'e verilen (zaten yetkilendirme-filtreli) parcalarin
+    # belgeleri - bkz. sorgu.py::cevapla. Ayri bir yetkilendirme sorgusu
+    # BURADA calistirilmaz, cevapla'nin dondurdugu listeye DOKUNULMADAN
+    # aktarilir.
+    cevap, skor, departman_id, kaynaklar = cevapla(
         istek.soru, istek.tenant_id, istek.departman_id, istek.kullanici_id, istek.rol
     )
-    return {"cevap": cevap, "skor": skor, "departman_id": departman_id}
+    return {"cevap": cevap, "skor": skor, "departman_id": departman_id, "kaynaklar": kaynaklar}
 
 @app.post("/indeksle")
 def indeksle_endpoint(

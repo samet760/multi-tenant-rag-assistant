@@ -16,7 +16,7 @@ SORULAR = [
 if __name__ == "__main__":
     for soru, beklenen in SORULAR:
         basla = time.time()
-        cevap,skor = cevapla(soru, "english-home")
+        cevap, skor, departman_id, kaynaklar = cevapla(soru, "english-home")
         sure = round(time.time() - basla, 1)
         print(f"\n[{beklenen}] {soru}")
         print(f"      {cevap}")
