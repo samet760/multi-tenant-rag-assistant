@@ -48,6 +48,12 @@ public class IndexModel : PageModel
     public record Departman(long Id, string Ad);
     public List<Departman> Departmanlar { get; set; } = new();
 
+    // RAG V2 CHECKPOINT 3 (kisa konusma hafizasi): FastAPI'ye gonderilen
+    // gecmis mesaj sekli - servis.py::GecmisMesaj ile alan alan AYNI
+    // (mesaj_rolu/metin, snake_case), ekstra bir .Select() esleme adimi
+    // GEREKMEZ (bkz. Kaynak ayni desen).
+    public record OncekiMesaj(string mesaj_rolu, string metin);
+
     public IActionResult OnGet()
     {
         DepartmanlariYukle();
@@ -176,6 +182,43 @@ public class IndexModel : PageModel
         }
     }
 
+    // RAG V2 CHECKPOINT 3 (kisa konusma hafizasi): AYNI sohbet+tenant+eposta
+    // sahiplik kontrolu - MesajlariYukle/OnPostSohbetSil ile BIREBIR AYNI
+    // desen, baska bir kullanicinin/tenant'in/sohbetin mesaji ASLA sizmaz.
+    // Cagrildiginda SohbetId != null GARANTI (bkz. cagiran) - taze/ilk soru
+    // icin bu metot HIC CAGRILMAZ, ekstra sorgu ATILMAZ. Yeni soru bu nokta
+    // itibariyle HENUZ mesajlar tablosuna YAZILMADI (INSERT'ler OnPostAsync'te
+    // /sor cagrisindan SONRA yapiliyor) - bu yuzden "onceki 2 mesaj" hicbir
+    // ekstra filtreye gerek kalmadan mevcut soruyu asla ICERMEZ.
+    private List<OncekiMesaj> OncekiMesajlariGetir(string tenant, string eposta)
+    {
+        const string SQL = @"
+            select m.rol, m.metin
+            from mesajlar m
+            join sohbetler s on s.id = m.sohbet_id
+            where m.sohbet_id = @s and s.tenant_id = @t and s.eposta = @e
+            order by m.id desc
+            limit 2";
+
+        var liste = new List<OncekiMesaj>();
+        using var baglanti = Db.Baglan();
+        using var komut = new NpgsqlCommand(SQL, baglanti);
+        komut.Parameters.AddWithValue("s", SohbetId!.Value);
+        komut.Parameters.AddWithValue("t", tenant);
+        komut.Parameters.AddWithValue("e", eposta);
+
+        using var okuyucu = komut.ExecuteReader();
+        while (okuyucu.Read())
+        {
+            liste.Add(new OncekiMesaj(okuyucu.GetString(0), okuyucu.GetString(1)));
+        }
+
+        // DESC ile cekildi (en yeni ONCE) - kronolojik siraya (en eski ONCE)
+        // CEVIR, LLM'e "ONCEKI SORU -> ONCEKI CEVAP" akisinda gitsin diye.
+        liste.Reverse();
+        return liste;
+    }
+
     public async Task<IActionResult> OnPostAsync()
     {
         DepartmanlariYukle();
@@ -207,10 +250,27 @@ public class IndexModel : PageModel
 
         var istemci = new HttpClient();
         var eposta = User.Identity!.Name;
+
+        // RAG V2 CHECKPOINT 3 (kisa konusma hafizasi): SADECE mevcut bir
+        // sohbette (SohbetId != null) ve GERCEKTEN onceki mesaj VARSA
+        // gonderilir - taze/ilk soru icin bu HER ZAMAN null kalir, ekstra
+        // sorgu/LLM cagrisi/davranis degisikligi OLMAZ (bkz. gorev talimati
+        // "no history / first question -> current behavior exactly as
+        // today").
+        List<OncekiMesaj>? gecmis = null;
+        if (SohbetId != null)
+        {
+            var oncekiMesajlar = OncekiMesajlariGetir(tenant, eposta!);
+            if (oncekiMesajlar.Count > 0)
+            {
+                gecmis = oncekiMesajlar;
+            }
+        }
+
         // departman_id her zaman null gonderilir - normal sohbette manuel
         // secim YOK, her soru sorgu.py::departman_yonlendir uzerinden
         // BAGIMSIZ/sifirdan otomatik yonlendirilir (bkz. gorev talimati).
-        var govde = new { soru = Soru, tenant_id = tenant, departman_id = (long?)null, kullanici_id = kullaniciId, rol };
+        var govde = new { soru = Soru, tenant_id = tenant, departman_id = (long?)null, kullanici_id = kullaniciId, rol, gecmis };
 
         SorguYaniti? sonuc = null;
         try

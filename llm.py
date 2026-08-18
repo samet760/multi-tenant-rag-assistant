@@ -74,10 +74,50 @@ SISTEM = (
     "Speak only in plain, natural Turkish as a company assistant would."
 )
 
+# RAG V2 CHECKPOINT 3 (kisa konusma hafizasi): bir takip sorusunu ("Peki
+# hafta sonu?" gibi), SADECE hemen onceki 1-2 mesaji kullanarak BAGIMSIZ/
+# standalone bir retrieval sorusuna donusturur. Bu SISTEM promptu KASITLI
+# olarak dar/kisitli - cevaplamaz, yeni bir sirket gercegi EKLEMEZ, SADECE
+# zamir/eksik ozne/atif/konusma eliptigini cozer. Onceki asistan cevabi
+# SADECE referans cozmek icin kullanilir - otorite bir kanit DEGILDIR (bkz.
+# sorgu.py::cevapla - nihai cevap HALA SADECE final RAG kanitindan gelir,
+# bu adim SADECE retrieval sorgusunu iyilestirir).
+BAGLAMSALLASTIRMA_SISTEM = (
+    "You rewrite a short Turkish follow-up question into a standalone "
+    "question, using ONLY the immediately preceding conversation turn as "
+    "context. Follow these rules exactly.\n"
+    "1. Do NOT answer the question.\n"
+    "2. Do NOT invent, add, or assume any corporate fact, number, policy, "
+    "date, location, role, product, or condition that is not ALREADY "
+    "explicitly present in the CURRENT question or the PREVIOUS turn.\n"
+    "3. The PREVIOUS assistant answer is conversational context only, NOT "
+    "an authoritative source - use it ONLY to resolve what a pronoun, "
+    "reference, or omitted subject in the CURRENT question refers to, "
+    "never to add a new fact into the rewritten question.\n"
+    "4. Only resolve pronouns, omitted subjects, references, and "
+    "conversational ellipsis (for example 'bunu', 'peki ya X', 'ne "
+    "zaman', 'onu').\n"
+    "5. If the CURRENT question is already self-contained/standalone, "
+    "return it UNCHANGED, verbatim.\n"
+    "6. If you cannot safely determine what a reference points to, return "
+    "the CURRENT question UNCHANGED rather than guessing.\n"
+    "7. Output ONLY the rewritten (or unchanged) question, in Turkish, "
+    "nothing else - no explanation, no quotes, no prefix, no labels."
+)
 
-def sor(soru, parcalar):
-    kullanici = "BAGLAM:\n" + "\n\n".join(parcalar) + "\n\nSORU: " + soru
 
+def _openrouter_tamamla(sistem_metni, kullanici_metni, max_tokens):
+    """OpenRouter'a TEK bir sohbet-tamamlama istegi atan KUCUK paylasilan
+    yardimci - sor() VE baglamsallastir() arasinda PAYLASILAN tek HTTP/
+    hata-yonetim kodu (gereksiz tekrar OLMASIN diye). AYNI provider/model
+    kullanilir - yeni bir saglayici/bagimlilik EKLENMEDI (bkz. gorev
+    talimati "Prefer reusing the CURRENT LLM/provider infrastructure").
+
+    DONER: (icerik, hata_metni). Basarili olursa icerik dolu/hata_metni
+    None; saglayici gecerli bir "choices" dondurmezse icerik None/hata_metni
+    kisa bir hata aciklamasi olur - cagiran BUNU KENDI dusme davranisina
+    gore ele alir (sor() dogrudan hata metnini dondurur, baglamsallastir()
+    ise guvenli sekilde ORIJINAL soruya duser)."""
     yanit = requests.post(
         URL,
         headers={
@@ -87,11 +127,11 @@ def sor(soru, parcalar):
         json={
             "model": MODEL,
             "messages": [
-                {"role": "system", "content": SISTEM},
-                {"role": "user", "content": kullanici},
+                {"role": "system", "content": sistem_metni},
+                {"role": "user", "content": kullanici_metni},
             ],
             "temperature": 0,
-            "max_tokens": 1000,
+            "max_tokens": max_tokens,
             "reasoning": {"enabled": False},
         },
     )
@@ -99,6 +139,43 @@ def sor(soru, parcalar):
     veri = yanit.json()
 
     if "choices" not in veri:
-        return f"[HATA {yanit.status_code}] {yanit.text[:200]}"
+        return None, f"[HATA {yanit.status_code}] {yanit.text[:200]}"
 
-    return veri["choices"][0]["message"]["content"]
+    return veri["choices"][0]["message"]["content"], None
+
+
+def sor(soru, parcalar):
+    kullanici = "BAGLAM:\n" + "\n\n".join(parcalar) + "\n\nSORU: " + soru
+    icerik, hata = _openrouter_tamamla(SISTEM, kullanici, 1000)
+    return icerik if icerik is not None else hata
+
+
+def baglamsallastir(soru, gecmis):
+    """RAG V2 CHECKPOINT 3: kisa bir takip sorusunu, SADECE hemen onceki
+    1-2 mesaji (gecmis) BAGLAM olarak kullanarak, BAGIMSIZ/standalone bir
+    retrieval sorusuna donusturur. gecmis her ogesinde .mesaj_rolu ("soru"
+    ya da "cevap") ve .metin bulunan herhangi bir nesne olabilir (Pydantic
+    modeli dahil - duck typing, ozel bir tip import EDILMEZ).
+
+    cagiran (sorgu.py::cevapla) gecmis BOSSA/None ise bu fonksiyonu HIC
+    CAGIRMAZ - ekstra saglayici istegi SADECE gercek bir takip sorusunda
+    atilir (bkz. gorev talimati "Do not make this call when there is no
+    previous history").
+
+    Saglayici basarisiz olursa (agdaki/API'deki bir sorun) GUVENLI dusme:
+    soru DEGISTIRILMEDEN, oldugu gibi doner - takip cozumlemesinin
+    basarisiz olmasi normal soru-cevap akisini KIRMAZ, sadece o soru
+    Genel Asistan/router icin biraz daha az baglamli kalir."""
+    baglam_satirlari = []
+    for mesaj in gecmis:
+        etiket = "ONCEKI SORU" if mesaj.mesaj_rolu == "soru" else "ONCEKI CEVAP"
+        baglam_satirlari.append(f"{etiket}: {mesaj.metin}")
+
+    kullanici = "\n".join(baglam_satirlari) + f"\n\nSU ANKI SORU: {soru}"
+
+    icerik, hata = _openrouter_tamamla(BAGLAMSALLASTIRMA_SISTEM, kullanici, 120)
+    if hata is not None:
+        return soru
+
+    yeniden_yazilan = icerik.strip()
+    return yeniden_yazilan if yeniden_yazilan else soru

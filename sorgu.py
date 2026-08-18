@@ -1,7 +1,7 @@
 import os
 import psycopg
 from dotenv import load_dotenv
-from llm import sor, YETERSIZ_KANIT_CEVABI, YETERSIZ_KANIT_CEVAPLARI
+from llm import sor, baglamsallastir, YETERSIZ_KANIT_CEVABI, YETERSIZ_KANIT_CEVAPLARI
 from embed import model
 from reranker import reranker_al
 
@@ -276,14 +276,35 @@ def final_baglam_sec(soru, tenant_id, departman_id, soru_str, kullanici_id, rol)
     return final_kanit, dense_top_skor
 
 
-def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None):
+def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None, gecmis=None):
     # kullanici_id / rol: servis.py'den gelen GUVENILIR .NET kimligi - hem
     # departman_yonlendir (ADIM C4) hem asagidaki asil getirme (ADIM C3)
     # yetkilendirme predikatinde kullanilir.
 
+    # RAG V2 CHECKPOINT 3 (kisa konusma hafizasi): gecmis - .NET'in AYNI
+    # sohbetten, AYNI kullaniciya ait (tenant_id+eposta scoped), yeni soru
+    # DB'ye YAZILMADAN ONCE cekilmis en fazla son 2 mesaji (bkz.
+    # Index.cshtml.cs::OncekiMesajlariGetir) - baska bir sohbetten/
+    # kullanicidan/tenant'tan asla gelemez, bu GUVENIRLIK zaten .NET
+    # tarafinda SAGLANMISTIR, burada TEKRAR SORGULANMAZ.
+    #
+    # gecmis BOSSA/None ise (ilk soru ya da .NET hic gondermedi)
+    # baglamsallastir() HIC CAGRILMAZ - EKSTRA saglayici istegi YOK, soru
+    # AYNEN kullanilir; davranis eskisiyle BIREBIR AYNI kalir (bkz. gorev
+    # talimati "no history / first question -> current behavior exactly as
+    # today"). Aksi halde soru, SADECE bu kisa gecmisi kullanarak BAGIMSIZ/
+    # standalone bir retrieval sorusuna donusturulur - bu donusturulmus soru
+    # embedding/routing/reranking/final retrieval/final cevap uretimi icin
+    # KULLANILIR (bkz. gorev talimati "WHICH QUESTION GOES WHERE"). Onceki
+    # asistan cevaplari bu adimda SADECE referans cozmek icin kullanilir,
+    # otorite bir kanit DEGILDIR - nihai cevap HALA SADECE asagidaki final
+    # RAG kanitindan (final_kanit) gelir, bu adim SADECE retrieval sorgusunu
+    # iyilestirir.
+    retrieval_sorusu = baglamsallastir(soru, gecmis) if gecmis else soru
+
     # TEK encode - hem yonlendirme sorgusu hem asagidaki asil getirme AYNI
     # soru_str'i kullanir, ikinci bir model.encode() cagrisi YAPILMAZ.
-    soru_v = model.encode(soru, normalize_embeddings=True)
+    soru_v = model.encode(retrieval_sorusu, normalize_embeddings=True)
     soru_str = str(soru_v.tolist())
 
     if departman_id is None:
@@ -298,7 +319,7 @@ def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None):
         # Router'in kendi (reranker) skoru (_router_skoru) production
         # akisinda KULLANILMAZ - sadece rag_benchmark.py::departman_yonlendir'i
         # DOGRUDAN cagirarak bu skoru gorebilir, cevapla() burada yoksayar.
-        departman_id, _router_skoru = departman_yonlendir(soru, tenant_id, soru_str, kullanici_id, rol)
+        departman_id, _router_skoru = departman_yonlendir(retrieval_sorusu, tenant_id, soru_str, kullanici_id, rol)
         if departman_id is None:
             return YETERSIZ_KANIT_CEVABI, 0, None, []
 
@@ -308,7 +329,7 @@ def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None):
     # FINAL_ADAY_TOP_K'yi reranker ile yeniden siralayip ilk FINAL_BAGLAM_K
     # parcayi NIHAI KANIT olarak dondurur (bkz. final_baglam_sec docstring'i
     # - "PROVENANCE - CRITICAL" notu). ESIK ARTIK burada KARSILASTIRILMAZ.
-    final_kanit, dense_top_skor = final_baglam_sec(soru, tenant_id, departman_id, soru_str, kullanici_id, rol)
+    final_kanit, dense_top_skor = final_baglam_sec(retrieval_sorusu, tenant_id, departman_id, soru_str, kullanici_id, rol)
 
     if not final_kanit:
         # Routed departmanda HICBIR yetkili aday yok - guvenli "bilgi yok"
@@ -319,9 +340,13 @@ def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None):
 
     # secilen: reranker SIRASINDA, TEKILLESTIRME OLMADAN - ayni belgeden
     # birden fazla parca gelmisse (tamamlayici olabilir, bkz. gorev talimati
-    # "FINAL EVIDENCE") HEPSI LLM'e gider.
+    # "FINAL EVIDENCE") HEPSI LLM'e gider. Nihai cevap uretimi de
+    # retrieval_sorusu'nu kullanir - final cevap LLM'i (llm.py::sor) hicbir
+    # konusma gecmisi GORMEZ, SADECE "BAGLAM + SORU" gorur; orijinal ham
+    # "Peki hafta sonu?" gonderilseydi bu LLM icin de eksik/anlamsiz
+    # kalirdi (bkz. gorev talimati "smallest clean approach").
     secilen = [aday[0] for aday in final_kanit]
-    cevap_metni = sor(soru, secilen)
+    cevap_metni = sor(retrieval_sorusu, secilen)
 
     # LLM'in KENDISI, sunulan NIHAI kanidin soruyu YETERSIZ karsiladigina
     # karar verebilir (bkz. llm.py rule 2/3 + YETERSIZ_KANIT_CEVAPLARI - bu

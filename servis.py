@@ -10,6 +10,18 @@ app = FastAPI()
 # tarafi zaten dogruluyor ama Python bu istege DOGRUDAN guvenmez.
 GECERLI_ERISIM_SEVIYELERI = {"sirket", "departman"}
 
+
+# RAG V2 CHECKPOINT 3 (kisa konusma hafizasi): mesajlar.rol degeriyle AYNI
+# sozluk ("soru"/"cevap") - alan adi BILINCLI olarak "mesaj_rolu" (SoruIstegi.
+# rol - GUVENILIR kullanici ROLU, "yonetici"/"kullanici" - ile
+# KARISTIRILMASIN diye). metin, o mesajin duz konusma metni - hicbir kaynak/
+# provenance bilgisi TASINMAZ (bkz. sorgu.py::cevapla "onceki asistan cevabi
+# otorite bir kanit DEGILDIR" notu).
+class GecmisMesaj(BaseModel):
+    mesaj_rolu: str
+    metin: str
+
+
 class SoruIstegi(BaseModel):
     soru: str
     tenant_id: str
@@ -27,6 +39,15 @@ class SoruIstegi(BaseModel):
     # Index.cshtml.cs).
     kullanici_id: int
     rol: str
+    # RAG V2 CHECKPOINT 3: OPSIYONEL - .NET SADECE AYNI sohbetin, AYNI
+    # kullaniciya ait (tenant_id+eposta scoped), yeni soru DB'ye YAZILMADAN
+    # ONCE cekilmis en fazla son 2 mesajini gonderir (bkz. Index.cshtml.cs::
+    # OncekiMesajlariGetir). Gonderilmezse/bossa (ilk soru) davranis
+    # TAMAMEN eskisi gibi kalir - sorgu.py::cevapla bu durumda EKSTRA bir
+    # LLM/saglayici cagrisi YAPMAZ (bkz. gorev talimati "no history / first
+    # question -> current behavior exactly as today").
+    gecmis: list[GecmisMesaj] | None = None
+
 
 @app.post("/sor")
 def sor_endpoint(istek: SoruIstegi):
@@ -38,7 +59,7 @@ def sor_endpoint(istek: SoruIstegi):
     # BURADA calistirilmaz, cevapla'nin dondurdugu listeye DOKUNULMADAN
     # aktarilir.
     cevap, skor, departman_id, kaynaklar = cevapla(
-        istek.soru, istek.tenant_id, istek.departman_id, istek.kullanici_id, istek.rol
+        istek.soru, istek.tenant_id, istek.departman_id, istek.kullanici_id, istek.rol, istek.gecmis
     )
     return {"cevap": cevap, "skor": skor, "departman_id": departman_id, "kaynaklar": kaynaklar}
 
