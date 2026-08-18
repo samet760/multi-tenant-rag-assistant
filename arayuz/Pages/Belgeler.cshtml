@@ -23,75 +23,101 @@
         </div>
     </div>
     <div class="flex-grow-1 ps-3" style="overflow-y:auto; min-width:0;">
-        <h2>Belgelerim</h2>
-
-        <form method="get" class="input-group mb-3" style="max-width:400px">
-            <input asp-for="Ara" class="form-control" placeholder="Dosya adına göre ara" />
-            <button type="submit" class="btn btn-outline-primary">Ara</button>
-        </form>
-
-        @if (!string.IsNullOrEmpty(Model.Ara))
+        @if (Model.DepartmanId == null)
         {
-            <p><a href="/Belgeler">Temizle</a></p>
-        }
+            <h2>Belgelerim</h2>
 
-        @if (Model.Liste.Count == 0)
-        {
-            if (string.IsNullOrEmpty(Model.Ara))
+            @if (Model.Departmanlar.Count == 0)
             {
-                <p>Henüz belge yüklenmemiş. <a href="/Yukle">Belge yükle</a></p>
+                <p>Görüntüleyebileceğiniz bir departman bulunamadı.</p>
             }
             else
             {
-                <p>Eşleşen belge bulunamadı.</p>
+                <div class="list-group" style="max-width:400px">
+                    @foreach (var dep in Model.Departmanlar)
+                    {
+                        <a href="/Belgeler?departmanId=@dep.Id" class="list-group-item list-group-item-action">
+                            @dep.Ad
+                        </a>
+                    }
+                </div>
             }
         }
         else
         {
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Dosya</th>
-                        <th>Yükleme</th>
-                        <th>Parça</th>
-                        @if (User.IsInRole("yonetici"))
-                        {
-                            <th></th>
-                        }
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var belge in Model.Liste)
-                    {
+            <p><a href="/Belgeler">&larr; Departmanlara dön</a></p>
+            <h2>@Model.SeciliDepartmanAdi</h2>
+
+            <form method="get" class="input-group mb-3" style="max-width:400px">
+                <input type="hidden" name="departmanId" value="@Model.DepartmanId" />
+                <input asp-for="Ara" class="form-control" placeholder="Dosya adına göre ara" />
+                <button type="submit" class="btn btn-outline-primary">Ara</button>
+            </form>
+
+            @if (!string.IsNullOrEmpty(Model.Ara))
+            {
+                <p><a href="/Belgeler?departmanId=@Model.DepartmanId">Temizle</a></p>
+            }
+
+            @if (Model.Liste.Count == 0)
+            {
+                if (string.IsNullOrEmpty(Model.Ara))
+                {
+                    <p>Bu departmanda erişebileceğiniz bir belge bulunamadı.</p>
+                }
+                else
+                {
+                    <p>Eşleşen belge bulunamadı.</p>
+                }
+            }
+            else
+            {
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td>
-                                @if (!string.IsNullOrEmpty(belge.DosyaYolu))
-                                {
-                                    <a href="/BelgeIndir?id=@belge.Id" target="_blank" class="belge-baglantisi">@belge.DosyaAdi</a>
-                                }
-                                else
-                                {
-                                    @belge.DosyaAdi
-                                }
-                            </td>
-                            <td>@belge.Tarih.ToString("dd.MM.yyyy HH:mm")</td>
-                            <td>@belge.ParcaSayisi</td>
+                            <th>Dosya</th>
+                            <th>Yükleme</th>
+                            <th>Parça</th>
                             @if (User.IsInRole("yonetici"))
                             {
-                                <td>
-                                    <form method="post" asp-page-handler="Sil">
-                                        <input type="hidden" name="id" value="@belge.Id" />
-                                        <button type="submit" class="btn btn-sm btn-danger"
-                                                onclick="return confirm('@belge.DosyaAdi silinsin mi?');">
-                                            Sil
-                                        </button>
-                                    </form>
-                                </td>
+                                <th></th>
                             }
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (var belge in Model.Liste)
+                        {
+                            <tr>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(belge.DosyaYolu))
+                                    {
+                                        <a href="/BelgeIndir?id=@belge.Id" target="_blank" class="belge-baglantisi">@belge.DosyaAdi</a>
+                                    }
+                                    else
+                                    {
+                                        @belge.DosyaAdi
+                                    }
+                                </td>
+                                <td>@belge.Tarih.ToString("dd.MM.yyyy HH:mm")</td>
+                                <td>@belge.ParcaSayisi</td>
+                                @if (User.IsInRole("yonetici"))
+                                {
+                                    <td>
+                                        <form method="post" asp-page-handler="Sil">
+                                            <input type="hidden" name="id" value="@belge.Id" />
+                                            <input type="hidden" name="departmanId" value="@Model.DepartmanId" />
+                                            <button type="submit" class="btn btn-sm btn-danger"
+                                                    onclick="return confirm('@belge.DosyaAdi silinsin mi?');">
+                                                Sil
+                                            </button>
+                                        </form>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
         }
     </div>
 </div>
