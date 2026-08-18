@@ -1,7 +1,7 @@
 import os
 import psycopg
 from dotenv import load_dotenv
-from llm import sor
+from llm import sor, YETERSIZ_KANIT_CEVAPLARI
 from embed import model
 from reranker import reranker_al
 
@@ -238,6 +238,18 @@ def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None):
         return "Bu bilgi dokümanlarda yer almıyor.", en_iyi, departman_id, []
 
     secilen = [s[0] for s in satirlar]
+    cevap_metni = sor(soru, secilen)
+
+    # LLM'in KENDISI, ESIK'i gecmis baglamin soruyu YETERSIZ karsiladigina
+    # karar verebilir (bkz. llm.py rule 2/3 + YETERSIZ_KANIT_CEVAPLARI - bu
+    # sabit kume, LLM'in SISTEM promptunda HARFIYEN uretmeye ZORLANDIGI iki
+    # cumleyle BIREBIR AYNI, tek kaynaktan gelir). Bu durumda baglam retrieval
+    # asamasinda "yeterli" gorunse bile CEVAPTA GERCEKTEN KULLANILMADI - UI'da
+    # "Kaynaklar: X.pdf" gosterip hemen altinda "yeterli bilgi yok" demek
+    # YANILTICI olurdu, o yuzden kaynaklar da BOS doner. Kontrol TAM ESITLIK -
+    # fuzzy bir substring/regex TAHMINI DEGIL (bkz. gorev talimati).
+    if cevap_metni in YETERSIZ_KANIT_CEVAPLARI:
+        return cevap_metni, satirlar[0][1], departman_id, []
 
     # Kaynaklar SADECE LLM'e verilen (secilen) parcalarin belgelerinden
     # olusur, ilk-gorulme sirasi korunarak belge_id'ye gore TEKILLESTIRILIR -
@@ -251,7 +263,7 @@ def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None):
         gorulen_belgeler.add(belge_id)
         kaynaklar.append({"belge_id": belge_id, "dosya_adi": dosya_adi})
 
-    return sor(soru, secilen), satirlar[0][1], departman_id, kaynaklar
+    return cevap_metni, satirlar[0][1], departman_id, kaynaklar
 
 
 
