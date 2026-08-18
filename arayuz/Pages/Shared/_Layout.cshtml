@@ -188,6 +188,10 @@
                                         <li><a class="dropdown-item" asp-page="/Logo">Logo</a></li>
                                     }
                                     <li><a class="dropdown-item" asp-page="/Belgeler">Belgelerim</a></li>
+                                    @if (User.IsInRole("kullanici"))
+                                    {
+                                        <li><a class="dropdown-item" asp-page="/Yetkilerim">Yetkilerim</a></li>
+                                    }
                                     <li><a class="dropdown-item" asp-page="/Cikis">Çıkış</a></li>
                                 </ul>
                             </li>

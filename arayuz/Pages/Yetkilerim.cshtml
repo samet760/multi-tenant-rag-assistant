@@ -1,0 +1,30 @@
+@page
+@model arayuz.Pages.YetkilerimModel
+@{
+    ViewData["Title"] = "Departman Yetkilerim";
+}
+
+<h2>Departman Yetkilerim</h2>
+
+@if (Model.Rol == "yonetici")
+{
+    <p>Yönetici hesapları için departmana özel yetkilendirme uygulanmaz.</p>
+}
+else
+{
+    @if (Model.Departmanlar.Count == 0)
+    {
+        <p>Henüz departmana özel bir yetkiniz yok.</p>
+    }
+    else
+    {
+        <ul>
+            @foreach (var d in Model.Departmanlar)
+            {
+                <li>@d.Ad</li>
+            }
+        </ul>
+    }
+
+    <p class="text-muted small">Şirket geneli belgeler tüm çalışanların erişimine açıktır.</p>
+}
