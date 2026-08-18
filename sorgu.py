@@ -1,4 +1,5 @@
 import os
+import time
 import psycopg
 from dotenv import load_dotenv
 from llm import sor, baglamsallastir, YETERSIZ_KANIT_CEVABI, YETERSIZ_KANIT_CEVAPLARI
@@ -7,6 +8,14 @@ from reranker import reranker_al
 
 load_dotenv()
 URL = os.getenv("SUPABASE_DB_URL")
+
+# LATENCY DIAGNOSTICS CHECKPOINT: opt-in olcum modu - bayrak KAPALIYKEN
+# davranis/performans onceki checkpoint ile BIREBIR AYNI kalir (zamanlama
+# fonksiyonlari cagrilir ama zamanlama=None gecildiginde her yerde erken
+# "if zamanlama is not None" kontroluyle ATLANIR - hicbir ekstra print/
+# hesap YAPILMAZ). Sadece olcum/tanı amacli - RAG davranisi/yetkilendirme/
+# retrieval/reranking/grounding'e HICBIR ETKISI YOK (bkz. gorev talimati).
+RAG_TIMING_ACIK = os.getenv("RAG_TIMING") == "1"
 # RAG V2 CHECKPOINT 2: RETIRED - ESIK ARTIK production'da cevaplanabilirlik
 # KARARI VERMEZ (bkz. gorev talimati "REMOVE ESIK AS PRODUCTION
 # ANSWERABILITY GATE"). Ham dense benzerlik guvenilir bir evrensel
@@ -127,7 +136,7 @@ def reranker_ile_sirala(soru, ogeler, metin_al):
     return esli
 
 
-def departman_yonlendir(soru, tenant_id, soru_str, kullanici_id=None, rol=None):
+def departman_yonlendir(soru, tenant_id, soru_str, kullanici_id=None, rol=None, zamanlama=None):
     """Genel Asistan modunda (departman_id verilmemis) soruyu hangi
     departmana yonlendirecegini belirler - LLM'e (sor()/OpenRouter'a)
     SORULMAZ, departman adi/ID'si hiçbir yerde hardcode EDILMEZ.
@@ -169,13 +178,29 @@ def departman_yonlendir(soru, tenant_id, soru_str, kullanici_id=None, rol=None):
     surecinin omru boyunca) AYNI yuklu ornegi yeniden kullanir, istek
     basina YENIDEN YUKLEME OLMAZ.
     """
+    # LATENCY DIAGNOSTICS: zamanlama SADECE RAG_TIMING=1 iken cevapla()
+    # tarafindan dolu bir dict olarak gecilir - None ise (varsayilan/normal
+    # istek) her perf_counter() cagrisi ATLANIR, davranis/hiz ETKILENMEZ.
+    t0 = time.perf_counter() if zamanlama is not None else None
     adaylar = departman_adaylari_getir(tenant_id, soru_str, kullanici_id, rol, ROUTER_TOP_K)
+    if zamanlama is not None:
+        zamanlama["router_sql"] = time.perf_counter() - t0
+        zamanlama["router_aday_n"] = len(adaylar)
     if not adaylar:
         return None, None
 
     # departman_adaylari_getir'in satir sekli: (departman_id, skor, belge_id,
     # dosya_adi, metin) - metin son eleman (indeks 4).
+    t1 = time.perf_counter() if zamanlama is not None else None
     siralanmis = reranker_ile_sirala(soru, adaylar, metin_al=lambda aday: aday[4])
+    if zamanlama is not None:
+        # Ilk /sor istegi (uvicorn restart sonrasi) burada reranker_al()'in
+        # LAZY model yuklemesini de ICERIR - bu yuzden ilk isteğin
+        # router_rerank suresi, sonraki SICAK isteklerden GOZLE GORULUR
+        # sekilde daha yuksek cikar (bkz. gorev talimati "distinguish cold
+        # start from warm requests"). Bilinclendirmek disinda BURADA hicbir
+        # ekstra model on-yukleme/lifecycle degisikligi YAPILMAZ.
+        zamanlama["router_rerank"] = time.perf_counter() - t1
     en_iyi_aday, en_iyi_skor = siralanmis[0]
     return en_iyi_aday[0], en_iyi_skor
 
@@ -231,7 +256,7 @@ def final_adaylari_getir(tenant_id, departman_id, soru_str, kullanici_id, rol, l
             return imlec.fetchall()
 
 
-def final_baglam_sec(soru, tenant_id, departman_id, soru_str, kullanici_id, rol):
+def final_baglam_sec(soru, tenant_id, departman_id, soru_str, kullanici_id, rol, zamanlama=None):
     """RAG V2 CHECKPOINT 2: routed departman icinde authorized DENSE top-
     FINAL_ADAY_TOP_K aday cekilir (final_adaylari_getir - AYNI yetkilendirme
     predikati, DEGISMEDI), reranker_ile_sirala ile YENIDEN siralanir, ilk
@@ -263,7 +288,11 @@ def final_baglam_sec(soru, tenant_id, departman_id, soru_str, kullanici_id, rol)
     Hic authorized aday yoksa ([], 0) doner - cagiran bunu MEVCUT "bilgi
     yok" davranisiyla ele alir, reranker bu durumda HIC CAGRILMAZ.
     """
+    t0 = time.perf_counter() if zamanlama is not None else None
     adaylar = final_adaylari_getir(tenant_id, departman_id, soru_str, kullanici_id, rol, FINAL_ADAY_TOP_K)
+    if zamanlama is not None:
+        zamanlama["final_sql"] = time.perf_counter() - t0
+        zamanlama["final_aday_n"] = len(adaylar)
     if not adaylar:
         return [], 0
 
@@ -271,9 +300,43 @@ def final_baglam_sec(soru, tenant_id, departman_id, soru_str, kullanici_id, rol)
 
     # final_adaylari_getir'in satir sekli: (metin, skor, belge_id,
     # dosya_adi) - metin ilk eleman (indeks 0).
+    t1 = time.perf_counter() if zamanlama is not None else None
     siralanmis = reranker_ile_sirala(soru, adaylar, metin_al=lambda aday: aday[0])
+    if zamanlama is not None:
+        # Router asamasindaki AYNI not gecerli: reranker_al() tekil oldugu
+        # icin model SADECE ilk cagrida yuklenir - bir istekte HEM router
+        # HEM final rerank calisirsa, model yukleme suresi SADECE router_
+        # rerank'a (ilk cagrilan) yansir, final_rerank zaten SICAK olur.
+        zamanlama["final_rerank"] = time.perf_counter() - t1
     final_kanit = [aday for aday, _rerank_skoru in siralanmis[:FINAL_BAGLAM_K]]
+    if zamanlama is not None:
+        zamanlama["final_kanit_n"] = len(final_kanit)
     return final_kanit, dense_top_skor
+
+
+def _zamanlama_yazdir(zamanlama):
+    """LATENCY DIAGNOSTICS: tek satirlik, hassas-olmayan bir tanı satiri
+    yazdirir - SADECE cevapla() RAG_TIMING_ACIK iken cagirir. .env/token/
+    sifre/baglanti dizesi/tam kullanici mesaji/belge icerigi/parca metni HIC
+    yazilmaz - sadece asama sureleri (saniye) ve kucuk sayimlar (bkz. gorev
+    talimati "DO NOT log ... full user messages ... sensitive chunk
+    text")."""
+    print(
+        "[RAG_TIMING] "
+        f"contextualize={zamanlama.get('contextualize', 0.0):.2f}s "
+        f"embed={zamanlama.get('embed', 0.0):.2f}s "
+        f"router_sql={zamanlama.get('router_sql', 0.0):.2f}s "
+        f"router_rerank={zamanlama.get('router_rerank', 0.0):.2f}s "
+        f"final_sql={zamanlama.get('final_sql', 0.0):.2f}s "
+        f"final_rerank={zamanlama.get('final_rerank', 0.0):.2f}s "
+        f"llm={zamanlama.get('llm', 0.0):.2f}s "
+        f"total={zamanlama.get('total', 0.0):.2f}s "
+        "| "
+        f"gecmis={zamanlama.get('gecmis_n', 0)} "
+        f"router_aday={zamanlama.get('router_aday_n', 0)} "
+        f"final_aday={zamanlama.get('final_aday_n', 0)} "
+        f"final_kanit={zamanlama.get('final_kanit_n', 0)}"
+    )
 
 
 def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None, gecmis=None):
@@ -281,101 +344,131 @@ def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None, gec
     # departman_yonlendir (ADIM C4) hem asagidaki asil getirme (ADIM C3)
     # yetkilendirme predikatinde kullanilir.
 
-    # RAG V2 CHECKPOINT 3 (kisa konusma hafizasi): gecmis - .NET'in AYNI
-    # sohbetten, AYNI kullaniciya ait (tenant_id+eposta scoped), yeni soru
-    # DB'ye YAZILMADAN ONCE cekilmis en fazla son 2 mesaji (bkz.
-    # Index.cshtml.cs::OncekiMesajlariGetir) - baska bir sohbetten/
-    # kullanicidan/tenant'tan asla gelemez, bu GUVENIRLIK zaten .NET
-    # tarafinda SAGLANMISTIR, burada TEKRAR SORGULANMAZ.
-    #
-    # gecmis BOSSA/None ise (ilk soru ya da .NET hic gondermedi)
-    # baglamsallastir() HIC CAGRILMAZ - EKSTRA saglayici istegi YOK, soru
-    # AYNEN kullanilir; davranis eskisiyle BIREBIR AYNI kalir (bkz. gorev
-    # talimati "no history / first question -> current behavior exactly as
-    # today"). Aksi halde soru, SADECE bu kisa gecmisi kullanarak BAGIMSIZ/
-    # standalone bir retrieval sorusuna donusturulur - bu donusturulmus soru
-    # embedding/routing/reranking/final retrieval/final cevap uretimi icin
-    # KULLANILIR (bkz. gorev talimati "WHICH QUESTION GOES WHERE"). Onceki
-    # asistan cevaplari bu adimda SADECE referans cozmek icin kullanilir,
-    # otorite bir kanit DEGILDIR - nihai cevap HALA SADECE asagidaki final
-    # RAG kanitindan (final_kanit) gelir, bu adim SADECE retrieval sorgusunu
-    # iyilestirir.
-    retrieval_sorusu = baglamsallastir(soru, gecmis) if gecmis else soru
+    # LATENCY DIAGNOSTICS CHECKPOINT: zamanlama, RAG_TIMING=1 DEGILSE None -
+    # asagidaki HER "if zamanlama is not None" kontrolu bu durumda ATLANIR,
+    # bayrak kapaliyken tek ekstra maliyet bu ucuz None-kontrolleridir (bkz.
+    # gorev talimati "default behavior ... must remain unchanged except for
+    # negligible timing-code overhead"). finally bloğu, HANGI return
+    # yolundan cikilirsa cikilsin (erken "departman bulunamadi"/"kanit yok"/
+    # "yetersiz kanit" ya da basarili yol) toplam sureyi dogru olcer ve TEK
+    # bir satir yazdirir.
+    zamanlama = {} if RAG_TIMING_ACIK else None
+    t_toplam = time.perf_counter() if zamanlama is not None else None
+    try:
+        # RAG V2 CHECKPOINT 3 (kisa konusma hafizasi): gecmis - .NET'in AYNI
+        # sohbetten, AYNI kullaniciya ait (tenant_id+eposta scoped), yeni soru
+        # DB'ye YAZILMADAN ONCE cekilmis en fazla son 2 mesaji (bkz.
+        # Index.cshtml.cs::OncekiMesajlariGetir) - baska bir sohbetten/
+        # kullanicidan/tenant'tan asla gelemez, bu GUVENIRLIK zaten .NET
+        # tarafinda SAGLANMISTIR, burada TEKRAR SORGULANMAZ.
+        #
+        # gecmis BOSSA/None ise (ilk soru ya da .NET hic gondermedi)
+        # baglamsallastir() HIC CAGRILMAZ - EKSTRA saglayici istegi YOK, soru
+        # AYNEN kullanilir; davranis eskisiyle BIREBIR AYNI kalir (bkz. gorev
+        # talimati "no history / first question -> current behavior exactly as
+        # today"). Aksi halde soru, SADECE bu kisa gecmisi kullanarak BAGIMSIZ/
+        # standalone bir retrieval sorusuna donusturulur - bu donusturulmus soru
+        # embedding/routing/reranking/final retrieval/final cevap uretimi icin
+        # KULLANILIR (bkz. gorev talimati "WHICH QUESTION GOES WHERE"). Onceki
+        # asistan cevaplari bu adimda SADECE referans cozmek icin kullanilir,
+        # otorite bir kanit DEGILDIR - nihai cevap HALA SADECE asagidaki final
+        # RAG kanitindan (final_kanit) gelir, bu adim SADECE retrieval sorgusunu
+        # iyilestirir.
+        if zamanlama is not None:
+            zamanlama["gecmis_n"] = len(gecmis) if gecmis else 0
+        t0 = time.perf_counter() if zamanlama is not None else None
+        retrieval_sorusu = baglamsallastir(soru, gecmis) if gecmis else soru
+        if zamanlama is not None:
+            # gecmis yoksa baglamsallastir() zaten hic CAGRILMADI - LATENCY
+            # DIAGNOSTICS gorev talimati "0 / skipped when there is no
+            # history" geregi burada acikca 0.0 yazilir, ELAPSED SURE
+            # ATLANIR (olculecek bir sey yok).
+            zamanlama["contextualize"] = (time.perf_counter() - t0) if gecmis else 0.0
 
-    # TEK encode - hem yonlendirme sorgusu hem asagidaki asil getirme AYNI
-    # soru_str'i kullanir, ikinci bir model.encode() cagrisi YAPILMAZ.
-    soru_v = model.encode(retrieval_sorusu, normalize_embeddings=True)
-    soru_str = str(soru_v.tolist())
+        # TEK encode - hem yonlendirme sorgusu hem asagidaki asil getirme AYNI
+        # soru_str'i kullanir, ikinci bir model.encode() cagrisi YAPILMAZ.
+        t0 = time.perf_counter() if zamanlama is not None else None
+        soru_v = model.encode(retrieval_sorusu, normalize_embeddings=True)
+        soru_str = str(soru_v.tolist())
+        if zamanlama is not None:
+            zamanlama["embed"] = time.perf_counter() - t0
 
-    if departman_id is None:
-        # Genel Asistan: departman otomatik secilir. Hicbir departmana
-        # yonlendirilemiyorsa (tenant'in departman-etiketli hic parcasi
-        # yoksa) TUM departmanlarda arama YAPILMAZ - guvenli "bilgi yok"
-        # cevabi doner (bkz. gorev talimati). Ucuncu deger (departman_id)
-        # HIC belirlenemedigi icin None - cagiran (.NET) bunu "yonlendirme
-        # basarisiz, gosterilecek departman adi yok" olarak okur. Dorduncu
-        # deger (kaynaklar) BOS - hicbir parca LLM'e verilmedi, yonlendirme
-        # adaylari kaynak SAYILMAZ (bkz. ADIM P2 "Guvenlik" notu).
-        # Router'in kendi (reranker) skoru (_router_skoru) production
-        # akisinda KULLANILMAZ - sadece rag_benchmark.py::departman_yonlendir'i
-        # DOGRUDAN cagirarak bu skoru gorebilir, cevapla() burada yoksayar.
-        departman_id, _router_skoru = departman_yonlendir(retrieval_sorusu, tenant_id, soru_str, kullanici_id, rol)
         if departman_id is None:
-            return YETERSIZ_KANIT_CEVABI, 0, None, []
+            # Genel Asistan: departman otomatik secilir. Hicbir departmana
+            # yonlendirilemiyorsa (tenant'in departman-etiketli hic parcasi
+            # yoksa) TUM departmanlarda arama YAPILMAZ - guvenli "bilgi yok"
+            # cevabi doner (bkz. gorev talimati). Ucuncu deger (departman_id)
+            # HIC belirlenemedigi icin None - cagiran (.NET) bunu "yonlendirme
+            # basarisiz, gosterilecek departman adi yok" olarak okur. Dorduncu
+            # deger (kaynaklar) BOS - hicbir parca LLM'e verilmedi, yonlendirme
+            # adaylari kaynak SAYILMAZ (bkz. ADIM P2 "Guvenlik" notu).
+            # Router'in kendi (reranker) skoru (_router_skoru) production
+            # akisinda KULLANILMAZ - sadece rag_benchmark.py::departman_yonlendir'i
+            # DOGRUDAN cagirarak bu skoru gorebilir, cevapla() burada yoksayar.
+            departman_id, _router_skoru = departman_yonlendir(retrieval_sorusu, tenant_id, soru_str, kullanici_id, rol, zamanlama)
+            if departman_id is None:
+                return YETERSIZ_KANIT_CEVABI, 0, None, []
 
-    # RAG V2 CHECKPOINT 2: final_baglam_sec, ROUTED departman icindeki
-    # yetkilendirme predikatini (final_adaylari_getir icinde, DEGISMEDI)
-    # HER ZAMAN reranker'dan ONCE uygular, sonra authorized dense top-
-    # FINAL_ADAY_TOP_K'yi reranker ile yeniden siralayip ilk FINAL_BAGLAM_K
-    # parcayi NIHAI KANIT olarak dondurur (bkz. final_baglam_sec docstring'i
-    # - "PROVENANCE - CRITICAL" notu). ESIK ARTIK burada KARSILASTIRILMAZ.
-    final_kanit, dense_top_skor = final_baglam_sec(retrieval_sorusu, tenant_id, departman_id, soru_str, kullanici_id, rol)
+        # RAG V2 CHECKPOINT 2: final_baglam_sec, ROUTED departman icindeki
+        # yetkilendirme predikatini (final_adaylari_getir icinde, DEGISMEDI)
+        # HER ZAMAN reranker'dan ONCE uygular, sonra authorized dense top-
+        # FINAL_ADAY_TOP_K'yi reranker ile yeniden siralayip ilk FINAL_BAGLAM_K
+        # parcayi NIHAI KANIT olarak dondurur (bkz. final_baglam_sec docstring'i
+        # - "PROVENANCE - CRITICAL" notu). ESIK ARTIK burada KARSILASTIRILMAZ.
+        final_kanit, dense_top_skor = final_baglam_sec(retrieval_sorusu, tenant_id, departman_id, soru_str, kullanici_id, rol, zamanlama)
 
-    if not final_kanit:
-        # Routed departmanda HICBIR yetkili aday yok - guvenli "bilgi yok"
-        # yolu, LLM HIC CAGRILMAZ (verilecek baglam yok). Eskiden bu ESIK'in
-        # "0 satir" dali ile AYNI davranistı - sadece artik "esik altinda
-        # kaldi" nedeni YOK, sadece "aday hic yok" nedeni var.
-        return YETERSIZ_KANIT_CEVABI, dense_top_skor, departman_id, []
+        if not final_kanit:
+            # Routed departmanda HICBIR yetkili aday yok - guvenli "bilgi yok"
+            # yolu, LLM HIC CAGRILMAZ (verilecek baglam yok). Eskiden bu ESIK'in
+            # "0 satir" dali ile AYNI davranistı - sadece artik "esik altinda
+            # kaldi" nedeni YOK, sadece "aday hic yok" nedeni var.
+            return YETERSIZ_KANIT_CEVABI, dense_top_skor, departman_id, []
 
-    # secilen: reranker SIRASINDA, TEKILLESTIRME OLMADAN - ayni belgeden
-    # birden fazla parca gelmisse (tamamlayici olabilir, bkz. gorev talimati
-    # "FINAL EVIDENCE") HEPSI LLM'e gider. Nihai cevap uretimi de
-    # retrieval_sorusu'nu kullanir - final cevap LLM'i (llm.py::sor) hicbir
-    # konusma gecmisi GORMEZ, SADECE "BAGLAM + SORU" gorur; orijinal ham
-    # "Peki hafta sonu?" gonderilseydi bu LLM icin de eksik/anlamsiz
-    # kalirdi (bkz. gorev talimati "smallest clean approach").
-    secilen = [aday[0] for aday in final_kanit]
-    cevap_metni = sor(retrieval_sorusu, secilen)
+        # secilen: reranker SIRASINDA, TEKILLESTIRME OLMADAN - ayni belgeden
+        # birden fazla parca gelmisse (tamamlayici olabilir, bkz. gorev talimati
+        # "FINAL EVIDENCE") HEPSI LLM'e gider. Nihai cevap uretimi de
+        # retrieval_sorusu'nu kullanir - final cevap LLM'i (llm.py::sor) hicbir
+        # konusma gecmisi GORMEZ, SADECE "BAGLAM + SORU" gorur; orijinal ham
+        # "Peki hafta sonu?" gonderilseydi bu LLM icin de eksik/anlamsiz
+        # kalirdi (bkz. gorev talimati "smallest clean approach").
+        secilen = [aday[0] for aday in final_kanit]
+        t0 = time.perf_counter() if zamanlama is not None else None
+        cevap_metni = sor(retrieval_sorusu, secilen)
+        if zamanlama is not None:
+            zamanlama["llm"] = time.perf_counter() - t0
 
-    # LLM'in KENDISI, sunulan NIHAI kanidin soruyu YETERSIZ karsiladigina
-    # karar verebilir (bkz. llm.py rule 2/3 + YETERSIZ_KANIT_CEVAPLARI - bu
-    # sabit kume, LLM'in SISTEM promptunda HARFIYEN uretmeye ZORLANDIGI iki
-    # cumleyle BIREBIR AYNI, tek kaynaktan gelir). Bu durumda kaynaklar da
-    # BOS doner - UI'da "Kaynaklar: X.pdf" gosterip hemen altinda "yeterli
-    # bilgi yok" demek YANILTICI olurdu. Kontrol TAM ESITLIK - fuzzy bir
-    # substring/regex TAHMINI DEGIL (bkz. gorev talimati).
-    if cevap_metni in YETERSIZ_KANIT_CEVAPLARI:
-        return cevap_metni, dense_top_skor, departman_id, []
+        # LLM'in KENDISI, sunulan NIHAI kanidin soruyu YETERSIZ karsiladigina
+        # karar verebilir (bkz. llm.py rule 2/3 + YETERSIZ_KANIT_CEVAPLARI - bu
+        # sabit kume, LLM'in SISTEM promptunda HARFIYEN uretmeye ZORLANDIGI iki
+        # cumleyle BIREBIR AYNI, tek kaynaktan gelir). Bu durumda kaynaklar da
+        # BOS doner - UI'da "Kaynaklar: X.pdf" gosterip hemen altinda "yeterli
+        # bilgi yok" demek YANILTICI olurdu. Kontrol TAM ESITLIK - fuzzy bir
+        # substring/regex TAHMINI DEGIL (bkz. gorev talimati).
+        if cevap_metni in YETERSIZ_KANIT_CEVAPLARI:
+            return cevap_metni, dense_top_skor, departman_id, []
 
-    # Kaynaklar SADECE final_kanit'in (LLM'e VERILEN, reranker sirali NIHAI
-    # kanit) belgelerinden olusur - baska HICBIR aday havuzundan (router,
-    # dense top-10'un reranker'da kaybeden geri kalani) provenance
-    # TURETILMEZ. Ilk-gorulme sirasi korunarak belge_id'ye gore
-    # TEKILLESTIRILIR - ayni belgeden birden fazla parca gelmisse
-    # (bkz. PROJECT_MAP.md "Top-K provenance semantics") tek bir kaynak
-    # satiri olarak gorunur. Bu tekillestirme SADECE goruntuleme icindir -
-    # LLM'e giden 'secilen' listesi (yukarida) TEKILLESTIRILMEMISTI.
-    kaynaklar = []
-    gorulen_belgeler = set()
-    for aday in final_kanit:
-        belge_id, dosya_adi = aday[2], aday[3]
-        if belge_id in gorulen_belgeler:
-            continue
-        gorulen_belgeler.add(belge_id)
-        kaynaklar.append({"belge_id": belge_id, "dosya_adi": dosya_adi})
+        # Kaynaklar SADECE final_kanit'in (LLM'e VERILEN, reranker sirali NIHAI
+        # kanit) belgelerinden olusur - baska HICBIR aday havuzundan (router,
+        # dense top-10'un reranker'da kaybeden geri kalani) provenance
+        # TURETILMEZ. Ilk-gorulme sirasi korunarak belge_id'ye gore
+        # TEKILLESTIRILIR - ayni belgeden birden fazla parca gelmisse
+        # (bkz. PROJECT_MAP.md "Top-K provenance semantics") tek bir kaynak
+        # satiri olarak gorunur. Bu tekillestirme SADECE goruntuleme icindir -
+        # LLM'e giden 'secilen' listesi (yukarida) TEKILLESTIRILMEMISTI.
+        kaynaklar = []
+        gorulen_belgeler = set()
+        for aday in final_kanit:
+            belge_id, dosya_adi = aday[2], aday[3]
+            if belge_id in gorulen_belgeler:
+                continue
+            gorulen_belgeler.add(belge_id)
+            kaynaklar.append({"belge_id": belge_id, "dosya_adi": dosya_adi})
 
-    return cevap_metni, dense_top_skor, departman_id, kaynaklar
+        return cevap_metni, dense_top_skor, departman_id, kaynaklar
+    finally:
+        if zamanlama is not None:
+            zamanlama["total"] = time.perf_counter() - t_toplam
+            _zamanlama_yazdir(zamanlama)
 
 
 

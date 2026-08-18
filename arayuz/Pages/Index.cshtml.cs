@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Npgsql;
+using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
@@ -248,6 +249,15 @@ public class IndexModel : PageModel
         var kullaniciId = long.Parse(kullaniciIdClaim.Value);
         var rol = User.FindFirst(ClaimTypes.Role)!.Value;
 
+        // LATENCY DIAGNOSTICS CHECKPOINT: opt-in olcum - CHAT_TIMING=1
+        // DEGILSE tum kronometreler yine calisir (Stopwatch maliyeti ihmal
+        // edilebilir seviyede, bkz. gorev talimati "negligible timing-code
+        // overhead") ama HICBIR SATIR yazdirilmaz - varsayilan davranis
+        // BIREBIR AYNI kalir. Sadece olcum/tani icindir, RAG/yetkilendirme
+        // davranisina HICBIR ETKISI YOK.
+        var chatTimingAcik = Environment.GetEnvironmentVariable("CHAT_TIMING") == "1";
+        var toplamKronometre = Stopwatch.StartNew();
+
         var istemci = new HttpClient();
         var eposta = User.Identity!.Name;
 
@@ -257,6 +267,7 @@ public class IndexModel : PageModel
         // sorgu/LLM cagrisi/davranis degisikligi OLMAZ (bkz. gorev talimati
         // "no history / first question -> current behavior exactly as
         // today").
+        var gecmisKronometre = Stopwatch.StartNew();
         List<OncekiMesaj>? gecmis = null;
         if (SohbetId != null)
         {
@@ -266,6 +277,7 @@ public class IndexModel : PageModel
                 gecmis = oncekiMesajlar;
             }
         }
+        gecmisKronometre.Stop();
 
         // departman_id her zaman null gonderilir - normal sohbette manuel
         // secim YOK, her soru sorgu.py::departman_yonlendir uzerinden
@@ -273,6 +285,7 @@ public class IndexModel : PageModel
         var govde = new { soru = Soru, tenant_id = tenant, departman_id = (long?)null, kullanici_id = kullaniciId, rol, gecmis };
 
         SorguYaniti? sonuc = null;
+        var fastApiKronometre = Stopwatch.StartNew();
         try
         {
             var yanit = await istemci.PostAsJsonAsync("http://127.0.0.1:8000/sor", govde);
@@ -316,6 +329,7 @@ public class IndexModel : PageModel
             // filtreye takilmadigi icin normal sekilde yukari firlar.
             Cevap = "İstek zaman aşımına uğradı. Lütfen daha kısa veya daha net bir soru deneyin.";
         }
+        fastApiKronometre.Stop();
 
         using var baglanti = Db.Baglan();
 
@@ -388,6 +402,20 @@ public class IndexModel : PageModel
             }
 
             islem.Commit();
+        }
+
+        toplamKronometre.Stop();
+        if (chatTimingAcik)
+        {
+            // Sadece asama sureleri (saniye) ve gecmis mesaj SAYISI - Soru/
+            // Cevap metni, tenant/eposta/tokenlar HICBIR SEKILDE burada
+            // yazdirilmaz (bkz. gorev talimati "DO NOT log ... full user
+            // messages").
+            Console.WriteLine(
+                $"[CHAT_TIMING] history_db={gecmisKronometre.Elapsed.TotalSeconds:F2}s " +
+                $"fastapi_http={fastApiKronometre.Elapsed.TotalSeconds:F2}s " +
+                $"total={toplamKronometre.Elapsed.TotalSeconds:F2}s " +
+                $"gecmis_sayisi={gecmis?.Count ?? 0}");
         }
 
         return RedirectToPage(new { sohbetId = SohbetId, sonKullanilanDepartmanId = SonKullanilanDepartmanId });
