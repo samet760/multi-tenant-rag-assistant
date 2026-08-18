@@ -49,7 +49,13 @@ Kısa referans — tam mimari için kod tabanının kendisine bakılmalı, bu sa
 - Retrieval/LLM: `sorgu.py`, `llm.py`
 - Chat sayfası: `arayuz/Pages/Index.cshtml(.cs)`
 - Sohbet paneli: `arayuz/ViewComponents/SohbetPaneliViewComponent.cs`, `arayuz/Views/Shared/Components/SohbetPaneli/Default.cshtml`
-- Belge listesi: `arayuz/Pages/Belgeler.cshtml(.cs)`
+- Belge listesi/gezinme: `arayuz/Pages/Belgeler.cshtml(.cs)`
+- Belge açma (yetkilendirmeli indirme): `arayuz/Pages/BelgeIndir.cshtml.cs`
+- Belge metadata düzenleme: `arayuz/Pages/BelgeDuzenle.cshtml(.cs)`
+- Departman yönetimi (CRUD): `arayuz/Pages/Departmanlar.cshtml(.cs)`
+- Kullanıcı yönetimi (rol yükselt/düşür): `arayuz/Pages/Kullanicilar.cshtml(.cs)`
+- Kullanıcı-departman yetki yönetimi: `arayuz/Pages/KullaniciDepartmanlari.cshtml(.cs)`
+- Salt-okunur kullanıcı yetkileri: `arayuz/Pages/Yetkilerim.cshtml(.cs)`
 
 ## Kural: tenant filtresi her sorguda açık olmalı
 
@@ -77,3 +83,15 @@ DB temeli (`migrations/002_erisim_kontrolu.sql`) ve uygulama katmanındaki zorun
 - **Varsayılan-red kuralları (herkes için):** `erisim_seviyesi IS NULL` → reddedilir (ne `sirket` ne `departman` dalına uyar). `erisim_seviyesi = 'departman'` VE `departman_id IS NULL` → reddedilir. Mevcut satırlar backfill edilmedi, bilinçli olarak NULL kaldı.
 - **Predikat SQL WHERE içinde, vector `ORDER BY`/`LIMIT`'ten ÖNCE uygulanır** — yetkisiz bir parça aday havuzuna hiç girmez, sonradan filtrelenmez. AYNI predikat hem `sorgu.py::departman_yonlendir` (Genel Asistan yönlendirmesi) hem `cevapla`'nın asıl getirme sorgusunda kullanılır — manuel departman seçimi de bu predikate tabidir, ATLAYAMAZ.
 - **Runtime doğrulandı:** `sirket` izinli → erişim VAR; `NULL` erişim → RED; üyeliksiz `departman` → RED; üyelikli `departman` → erişim VAR; `yonetici` üyeliksiz `departman`'a → erişim VAR; Genel Asistan yönlendirmesi sadece yetkili aday havuzuna göre karar veriyor.
+
+## Admin & Bilgi Yönetimi — tamamlandı
+
+Yukarıdaki departman mimarisi ve erişim kontrolü temeli üzerine, Supabase SQL Editor'e HİÇ gerek kalmadan uygulama içinden yönetim için eklendi:
+
+- **Departman yönetimi** (`arayuz/Pages/Departmanlar.cshtml(.cs)`, yönetici-only): listeleme, oluşturma, yeniden adlandırma, silme — hepsi `tenant_id` scoped. Silme, `belgeler.departman_id` FK'sinin (ON DELETE NO ACTION, bkz. migrations/001) engeliyle korunur — o departmana bağlı belge varsa Postgres silmeyi reddeder; force-delete veya arşiv modeli YOK, admin önce belgeleri başka bir departmana taşımak/silmek zorunda.
+- **Güvenli departman-bazlı belge gezinme** (`/Belgeler`, bkz. yukarıdaki dosya listesi): önce tenant departmanları kart/liste olarak gösterilir, bir departman seçilince (`?departmanId=`) o departmanın belgeleri listelenir. Normal `kullanici` sadece yetkili olduğu belgeleri görür (`sirket` → tenant geneli, `departman` → `kullanici_departmanlari` üyeliği zorunlu); `yonetici` üyelik aranmadan tüm `departman` belgelerini de görür. `erisim_seviyesi IS NULL` her zaman gizli (varsayılan-red). Doğrudan `/BelgeIndir?id=` açma da AYNI yetkilendirme predikatını tekrar uygular ve reddedince tek tip `NotFound()` döner — liste kısıtı id tahmin ederek ATLANAMAZ.
+- **Kullanıcı-departman yetki yönetimi** (`arayuz/Pages/KullaniciDepartmanlari.cshtml(.cs)`, `/Kullanicilar`'daki her kullanıcı satırından ulaşılır): açık `kullanici_departmanlari` satırları uygulama içinden verilebilir/kaldırılabilir. Her grant/revoke, hem kullanıcının hem departmanın çağıran yöneticinin tenant'ına ait olduğunu AYNI SQL ifadesi içinde ispatlar (tablonun kendi `tenant_id` kolonu yok). `yonetici` kullanıcılar için üyelik kontrolleri UI'da BİLİNÇLİ olarak gösterilmez — rol zaten üyelikten bağımsız tenant geneli erişime sahip, editable checkbox göstermek yanıltıcı olurdu.
+- **Belge metadata düzenleme** (`arayuz/Pages/BelgeDuzenle.cshtml(.cs)`, yönetici-only): mevcut bir belgenin departmanı ve erişim seviyesi düzeltilebilir. `belgeler` ve o belgeye ait TÜM `parcalar` satırları AYNI transaction içinde güncellenir (biri başarısız olursa ikisi de geri alınır) — vektörler/metin/chunk'lar YENİDEN ÜRETİLMEZ, sadece denormalize metadata kopyaları senkron tutulur.
+- **Salt-okunur "Departman Yetkilerim"** (`arayuz/Pages/Yetkilerim.cshtml(.cs)`, normal `kullanici`'ye özel nav girişi): kullanıcı sadece kendi açık departman üyeliklerini görür, hiçbir mutasyon kontrolü YOK. Şirket geneli erişim AÇIKLAYICI bir not olarak gösterilir, bireysel bir izinmiş gibi SUNULMAZ. `yonetici` bu sayfaya nav linki almaz (rol zaten üyelikten bağımsız erişime sahip); sayfa doğrudan URL ile ziyaret edilirse güvenli, salt-bilgilendirici bir mesaj gösterir.
+
+**Runtime doğrulandı:** erişim-kontrolü izin/red matrisi (`sirket`/`departman`/`NULL` × `kullanici`/`yonetici` × üyelikli/üyeliksiz), güvenli routing (`?departmanId=` ile cross-tenant/geçersiz id fail-safe), güvenli belge listeleme/açma (`BelgeIndir` id tahminiyle atlanamıyor), izin verme/kaldırma (cross-tenant çift hiçbir satırı etkilemiyor), belge metadata değişikliği (`belgeler`+`parcalar` atomik senkron), departman CRUD güvenliği (silme FK koruması, cross-tenant id'ler hiçbir işlemi etkilemiyor).
