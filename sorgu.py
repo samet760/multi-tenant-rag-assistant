@@ -47,7 +47,52 @@ FINAL_BAGLAM_K = 4
 
 
 
-def departman_adaylari_getir(tenant_id, soru_str, kullanici_id, rol, limit):
+def _departman_adaylari_sorgula(baglanti, tenant_id, soru_str, kullanici_id, rol, limit):
+    """SQL'in TEK KOPYASI - departman_adaylari_getir tarafindan, ya kendi
+    actigi ya da cagirandan devralinan bir baglanti ile cagirilir (bkz.
+    asagisi). Burada SQL metni/parametre sirasi ONCEKI haliyle BIREBIR
+    AYNI - SADECE baglanti disaridan parametre olarak alinir."""
+    with baglanti.cursor() as imlec:
+        # Yetkilendirme predikati C3 ile AYNI mantik, tek fark: burada
+        # tek bir departman_id'ye sabitlenmis outer filtre YOK (Genel
+        # Asistan henuz hangi departmana yonlendirecegini SECMEDI) -
+        # predikat HER aday satirin KENDI departman_id'sine gore
+        # degerlendirilir (EXISTS alt sorgusu parcalar.departman_id'yi
+        # referans alir).
+        imlec.execute(
+            """
+            select p.departman_id,
+                   1 - (p.vektor <=> %s::vector) as skor,
+                   p.belge_id,
+                   b.dosya_adi,
+                   p.metin
+            from parcalar p
+            join belgeler b on b.id = p.belge_id and b.tenant_id = %s
+            where p.tenant_id = %s and p.departman_id is not null
+            and (
+                p.erisim_seviyesi = 'sirket'
+                or (
+                    p.erisim_seviyesi = 'departman'
+                    and p.departman_id is not null
+                    and (
+                        %s = 'yonetici'
+                        or exists (
+                            select 1 from kullanici_departmanlari kd
+                            where kd.kullanici_id = %s
+                              and kd.departman_id = p.departman_id
+                        )
+                    )
+                )
+            )
+            order by p.vektor <=> %s::vector
+            limit %s
+            """,
+            (soru_str, tenant_id, tenant_id, rol, kullanici_id, soru_str, limit),
+        )
+        return imlec.fetchall()
+
+
+def departman_adaylari_getir(tenant_id, soru_str, kullanici_id, rol, limit, baglanti=None):
     """Yonlendirme icin yetkilendirme-filtreli ADAY sorgusu - TEK yer, hem
     departman_yonlendir (limit=ROUTER_TOP_K ile, production - RAG V2
     CHECKPOINT 1'den itibaren reranker'a giden authorized aday havuzu) HEM
@@ -64,46 +109,16 @@ def departman_adaylari_getir(tenant_id, soru_str, kullanici_id, rol, limit):
     - bu JOIN satir KUMESINI/SIRALAMAYI degistiremez (hic satir dusmez/
     eklenmez), SADECE ek kolonlari GORUNUR kilar. Ekstra per-aday sorgu YOK -
     tum adaylar TEK bir sorguda gelir.
-    """
-    with psycopg.connect(URL) as baglanti:
-        with baglanti.cursor() as imlec:
-            # Yetkilendirme predikati C3 ile AYNI mantik, tek fark: burada
-            # tek bir departman_id'ye sabitlenmis outer filtre YOK (Genel
-            # Asistan henuz hangi departmana yonlendirecegini SECMEDI) -
-            # predikat HER aday satirin KENDI departman_id'sine gore
-            # degerlendirilir (EXISTS alt sorgusu parcalar.departman_id'yi
-            # referans alir).
-            imlec.execute(
-                """
-                select p.departman_id,
-                       1 - (p.vektor <=> %s::vector) as skor,
-                       p.belge_id,
-                       b.dosya_adi,
-                       p.metin
-                from parcalar p
-                join belgeler b on b.id = p.belge_id and b.tenant_id = %s
-                where p.tenant_id = %s and p.departman_id is not null
-                and (
-                    p.erisim_seviyesi = 'sirket'
-                    or (
-                        p.erisim_seviyesi = 'departman'
-                        and p.departman_id is not null
-                        and (
-                            %s = 'yonetici'
-                            or exists (
-                                select 1 from kullanici_departmanlari kd
-                                where kd.kullanici_id = %s
-                                  and kd.departman_id = p.departman_id
-                            )
-                        )
-                    )
-                )
-                order by p.vektor <=> %s::vector
-                limit %s
-                """,
-                (soru_str, tenant_id, tenant_id, rol, kullanici_id, soru_str, limit),
-            )
-            return imlec.fetchall()
+
+    LATENCY OPTIMIZATION CHECKPOINT (connection reuse): baglanti OPSIYONEL -
+    verilmezse (rag_benchmark.py ve her turlu bagimsiz cagiri - MEVCUT
+    davranis) kendi baglantisini acar/kapatir, ONCEKI ile BIREBIR AYNI.
+    Verilirse (production cevapla() - bkz. asagisi) o baglanti AYNEN
+    kullanilir, burada ASLA kapatilmaz - sahibi (cevapla()) kapatir."""
+    if baglanti is not None:
+        return _departman_adaylari_sorgula(baglanti, tenant_id, soru_str, kullanici_id, rol, limit)
+    with psycopg.connect(URL) as yeni_baglanti:
+        return _departman_adaylari_sorgula(yeni_baglanti, tenant_id, soru_str, kullanici_id, rol, limit)
 
 
 def reranker_ile_sirala(soru, ogeler, metin_al):
@@ -136,7 +151,7 @@ def reranker_ile_sirala(soru, ogeler, metin_al):
     return esli
 
 
-def departman_yonlendir(soru, tenant_id, soru_str, kullanici_id=None, rol=None, zamanlama=None):
+def departman_yonlendir(soru, tenant_id, soru_str, kullanici_id=None, rol=None, zamanlama=None, baglanti=None):
     """Genel Asistan modunda (departman_id verilmemis) soruyu hangi
     departmana yonlendirecegini belirler - LLM'e (sor()/OpenRouter'a)
     SORULMAZ, departman adi/ID'si hiçbir yerde hardcode EDILMEZ.
@@ -177,12 +192,18 @@ def departman_yonlendir(soru, tenant_id, soru_str, kullanici_id=None, rol=None, 
     ilk /sor istegi modeli yukler, sonraki HER istek (bu FastAPI/uvicorn
     surecinin omru boyunca) AYNI yuklu ornegi yeniden kullanir, istek
     basina YENIDEN YUKLEME OLMAZ.
+
+    LATENCY OPTIMIZATION CHECKPOINT (connection reuse): baglanti OPSIYONEL -
+    production cevapla() burada AYNI (final_baglam_sec ile PAYLASILAN)
+    baglantiyi gecirir, bu fonksiyon onu ASLA kapatmaz - sadece
+    departman_adaylari_getir'e AYNEN aktarir. baglanti verilmezse (rag_
+    benchmark.py) MEVCUT self-contained davranis korunur.
     """
     # LATENCY DIAGNOSTICS: zamanlama SADECE RAG_TIMING=1 iken cevapla()
     # tarafindan dolu bir dict olarak gecilir - None ise (varsayilan/normal
     # istek) her perf_counter() cagrisi ATLANIR, davranis/hiz ETKILENMEZ.
     t0 = time.perf_counter() if zamanlama is not None else None
-    adaylar = departman_adaylari_getir(tenant_id, soru_str, kullanici_id, rol, ROUTER_TOP_K)
+    adaylar = departman_adaylari_getir(tenant_id, soru_str, kullanici_id, rol, ROUTER_TOP_K, baglanti)
     if zamanlama is not None:
         zamanlama["router_sql"] = time.perf_counter() - t0
         zamanlama["router_aday_n"] = len(adaylar)
@@ -205,7 +226,53 @@ def departman_yonlendir(soru, tenant_id, soru_str, kullanici_id=None, rol=None, 
     return en_iyi_aday[0], en_iyi_skor
 
 
-def final_adaylari_getir(tenant_id, departman_id, soru_str, kullanici_id, rol, limit):
+def _final_adaylari_sorgula(baglanti, tenant_id, departman_id, soru_str, kullanici_id, rol, limit):
+    """SQL'in TEK KOPYASI - final_adaylari_getir tarafindan, ya kendi actigi
+    ya da cagirandan devralinan bir baglanti ile cagirilir (bkz. asagisi).
+    SQL metni/parametre sirasi ONCEKI haliyle BIREBIR AYNI - SADECE baglanti
+    disaridan parametre olarak alinir."""
+    with baglanti.cursor() as imlec:
+        # ADIM P2 (kaynak izlenebilirligi): AYNI yetkilendirme-filtreli
+        # sorguya belgeler JOIN edilir - p.belge_id/b.dosya_adi SADECE bu
+        # sorgunun zaten dondurdugu (yetkilendirilmis) satirlardan gelir,
+        # ikinci/ayri bir dosya-adi sorgusu YOK. JOIN kosulu tenant'i
+        # IKI KEZ dogrular (b.tenant_id = %s, p.tenant_id zaten WHERE'de) -
+        # parcalar.belge_id FK'si zaten belgeler.id'ye cascade bagli
+        # oldugu icin bu normalde gereksiz ama BelgeDuzenle/Belgeler'deki
+        # AYNI "iki tarafi da ayrica ispatla" desenine uyar.
+        imlec.execute(
+            """
+            select p.metin,
+                   1 - (p.vektor <=> %s::vector) as skor,
+                   p.belge_id,
+                   b.dosya_adi
+            from parcalar p
+            join belgeler b on b.id = p.belge_id and b.tenant_id = %s
+            where p.tenant_id = %s and p.departman_id = %s
+            and (
+                p.erisim_seviyesi = 'sirket'
+                or (
+                    p.erisim_seviyesi = 'departman'
+                    and p.departman_id is not null
+                    and (
+                        %s = 'yonetici'
+                        or exists (
+                            select 1 from kullanici_departmanlari kd
+                            where kd.kullanici_id = %s
+                              and kd.departman_id = p.departman_id
+                        )
+                    )
+                )
+            )
+            order by p.vektor <=> %s::vector
+            limit %s
+            """,
+            (soru_str, tenant_id, tenant_id, departman_id, rol, kullanici_id, soru_str, limit),
+        )
+        return imlec.fetchall()
+
+
+def final_adaylari_getir(tenant_id, departman_id, soru_str, kullanici_id, rol, limit, baglanti=None):
     """Final yetkilendirme-filtreli aday sorgusu - TEK yer, hem final_baglam_
     sec (limit=FINAL_ADAY_TOP_K ile, production - RAG V2 CHECKPOINT 2'den
     itibaren reranker'a giden authorized aday havuzu) HEM rag_benchmark.py
@@ -213,50 +280,21 @@ def final_adaylari_getir(tenant_id, departman_id, soru_str, kullanici_id, rol, l
     halinden BIREBIR AYNI metin - SADECE LIMIT parametrik hale getirildi.
     Boylece iki cagiran ASLA farkli bir yetkilendirme mantigina SESSIZCE
     SAPAMAZ (bkz. RAG V2 tani checkpoint gorev talimati "Avoid duplicating
-    the production SQL in a way that could silently diverge")."""
-    with psycopg.connect(URL) as baglanti:
-        with baglanti.cursor() as imlec:
-            # ADIM P2 (kaynak izlenebilirligi): AYNI yetkilendirme-filtreli
-            # sorguya belgeler JOIN edilir - p.belge_id/b.dosya_adi SADECE bu
-            # sorgunun zaten dondurdugu (yetkilendirilmis) satirlardan gelir,
-            # ikinci/ayri bir dosya-adi sorgusu YOK. JOIN kosulu tenant'i
-            # IKI KEZ dogrular (b.tenant_id = %s, p.tenant_id zaten WHERE'de) -
-            # parcalar.belge_id FK'si zaten belgeler.id'ye cascade bagli
-            # oldugu icin bu normalde gereksiz ama BelgeDuzenle/Belgeler'deki
-            # AYNI "iki tarafi da ayrica ispatla" desenine uyar.
-            imlec.execute(
-                """
-                select p.metin,
-                       1 - (p.vektor <=> %s::vector) as skor,
-                       p.belge_id,
-                       b.dosya_adi
-                from parcalar p
-                join belgeler b on b.id = p.belge_id and b.tenant_id = %s
-                where p.tenant_id = %s and p.departman_id = %s
-                and (
-                    p.erisim_seviyesi = 'sirket'
-                    or (
-                        p.erisim_seviyesi = 'departman'
-                        and p.departman_id is not null
-                        and (
-                            %s = 'yonetici'
-                            or exists (
-                                select 1 from kullanici_departmanlari kd
-                                where kd.kullanici_id = %s
-                                  and kd.departman_id = p.departman_id
-                            )
-                        )
-                    )
-                )
-                order by p.vektor <=> %s::vector
-                limit %s
-                """,
-                (soru_str, tenant_id, tenant_id, departman_id, rol, kullanici_id, soru_str, limit),
-            )
-            return imlec.fetchall()
+    the production SQL in a way that could silently diverge").
+
+    LATENCY OPTIMIZATION CHECKPOINT (connection reuse): baglanti OPSIYONEL -
+    verilmezse (rag_benchmark.py ve her turlu bagimsiz cagiri - MEVCUT
+    davranis) kendi baglantisini acar/kapatir, ONCEKI ile BIREBIR AYNI.
+    Verilirse (production cevapla() - bkz. asagisi, AYNI baglanti router
+    sorgusuyla PAYLASILIR) o baglanti AYNEN kullanilir, burada ASLA
+    kapatilmaz - sahibi (cevapla()) kapatir."""
+    if baglanti is not None:
+        return _final_adaylari_sorgula(baglanti, tenant_id, departman_id, soru_str, kullanici_id, rol, limit)
+    with psycopg.connect(URL) as yeni_baglanti:
+        return _final_adaylari_sorgula(yeni_baglanti, tenant_id, departman_id, soru_str, kullanici_id, rol, limit)
 
 
-def final_baglam_sec(soru, tenant_id, departman_id, soru_str, kullanici_id, rol, zamanlama=None):
+def final_baglam_sec(soru, tenant_id, departman_id, soru_str, kullanici_id, rol, zamanlama=None, baglanti=None):
     """RAG V2 CHECKPOINT 2: routed departman icinde authorized DENSE top-
     FINAL_ADAY_TOP_K aday cekilir (final_adaylari_getir - AYNI yetkilendirme
     predikati, DEGISMEDI), reranker_ile_sirala ile YENIDEN siralanir, ilk
@@ -287,9 +325,15 @@ def final_baglam_sec(soru, tenant_id, departman_id, soru_str, kullanici_id, rol,
 
     Hic authorized aday yoksa ([], 0) doner - cagiran bunu MEVCUT "bilgi
     yok" davranisiyla ele alir, reranker bu durumda HIC CAGRILMAZ.
+
+    LATENCY OPTIMIZATION CHECKPOINT (connection reuse): baglanti OPSIYONEL -
+    production cevapla() burada AYNI (departman_yonlendir ile PAYLASILAN)
+    baglantiyi gecirir, bu fonksiyon onu ASLA kapatmaz - sadece
+    final_adaylari_getir'e AYNEN aktarir. baglanti verilmezse (rag_
+    benchmark.py) MEVCUT self-contained davranis korunur.
     """
     t0 = time.perf_counter() if zamanlama is not None else None
-    adaylar = final_adaylari_getir(tenant_id, departman_id, soru_str, kullanici_id, rol, FINAL_ADAY_TOP_K)
+    adaylar = final_adaylari_getir(tenant_id, departman_id, soru_str, kullanici_id, rol, FINAL_ADAY_TOP_K, baglanti)
     if zamanlama is not None:
         zamanlama["final_sql"] = time.perf_counter() - t0
         zamanlama["final_aday_n"] = len(adaylar)
@@ -325,6 +369,7 @@ def _zamanlama_yazdir(zamanlama):
         "[RAG_TIMING] "
         f"contextualize={zamanlama.get('contextualize', 0.0):.2f}s "
         f"embed={zamanlama.get('embed', 0.0):.2f}s "
+        f"db_connect={zamanlama.get('db_connect', 0.0):.2f}s "
         f"router_sql={zamanlama.get('router_sql', 0.0):.2f}s "
         f"router_rerank={zamanlama.get('router_rerank', 0.0):.2f}s "
         f"final_sql={zamanlama.get('final_sql', 0.0):.2f}s "
@@ -393,29 +438,53 @@ def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None, gec
         if zamanlama is not None:
             zamanlama["embed"] = time.perf_counter() - t0
 
-        if departman_id is None:
-            # Genel Asistan: departman otomatik secilir. Hicbir departmana
-            # yonlendirilemiyorsa (tenant'in departman-etiketli hic parcasi
-            # yoksa) TUM departmanlarda arama YAPILMAZ - guvenli "bilgi yok"
-            # cevabi doner (bkz. gorev talimati). Ucuncu deger (departman_id)
-            # HIC belirlenemedigi icin None - cagiran (.NET) bunu "yonlendirme
-            # basarisiz, gosterilecek departman adi yok" olarak okur. Dorduncu
-            # deger (kaynaklar) BOS - hicbir parca LLM'e verilmedi, yonlendirme
-            # adaylari kaynak SAYILMAZ (bkz. ADIM P2 "Guvenlik" notu).
-            # Router'in kendi (reranker) skoru (_router_skoru) production
-            # akisinda KULLANILMAZ - sadece rag_benchmark.py::departman_yonlendir'i
-            # DOGRUDAN cagirarak bu skoru gorebilir, cevapla() burada yoksayar.
-            departman_id, _router_skoru = departman_yonlendir(retrieval_sorusu, tenant_id, soru_str, kullanici_id, rol, zamanlama)
+        # LATENCY OPTIMIZATION CHECKPOINT (connection reuse): router VE final
+        # getirme, ARTIK TEK bir PostgreSQL baglantisini PAYLASIR - onceden
+        # her biri kendi ayri psycopg.connect(URL)'ini aciyor/kapatiyordu
+        # (bkz. gorev talimati "router_sql ~3.7-4.6s, final_sql ~3.7-5.1s -
+        # repeated connection establishment is a strong suspected
+        # contributor"). autocommit=True BILINCLI SECIM: bu SELECT'ler
+        # arasinda saniyeler suren CPU-bound reranking var - autocommit
+        # OLMASAYDI (psycopg3 varsayilani) ilk SELECT implicit bir
+        # transaction ACAR ve final SELECT'e kadar bu transaction "idle in
+        # transaction" halde Supabase'de ACIK KALIRDI. autocommit=True ile
+        # HER SELECT kendi baslar/biter, iki sorgu arasinda ACIK bir
+        # transaction HIC OLMAZ - salt-okunur SELECT'ler icin sorgu
+        # SEMANTIGINI degistirmez (yazma YOK, izolasyon/tutarlilik
+        # gereksinimi YOK). Baglanti SADECE bu retrieval bolumu icin acilir -
+        # LLM cagrisindan (sor()) ONCE, final rerank biter bitmez, finally
+        # icinde KAPATILIR (asagisi) - hicbir yolda (basarili/erken "yok"/
+        # exception) SIZDIRILMAZ.
+        t0 = time.perf_counter() if zamanlama is not None else None
+        baglanti = psycopg.connect(URL, autocommit=True)
+        if zamanlama is not None:
+            zamanlama["db_connect"] = time.perf_counter() - t0
+        try:
             if departman_id is None:
-                return YETERSIZ_KANIT_CEVABI, 0, None, []
+                # Genel Asistan: departman otomatik secilir. Hicbir departmana
+                # yonlendirilemiyorsa (tenant'in departman-etiketli hic parcasi
+                # yoksa) TUM departmanlarda arama YAPILMAZ - guvenli "bilgi yok"
+                # cevabi doner (bkz. gorev talimati). Ucuncu deger (departman_id)
+                # HIC belirlenemedigi icin None - cagiran (.NET) bunu "yonlendirme
+                # basarisiz, gosterilecek departman adi yok" olarak okur. Dorduncu
+                # deger (kaynaklar) BOS - hicbir parca LLM'e verilmedi, yonlendirme
+                # adaylari kaynak SAYILMAZ (bkz. ADIM P2 "Guvenlik" notu).
+                # Router'in kendi (reranker) skoru (_router_skoru) production
+                # akisinda KULLANILMAZ - sadece rag_benchmark.py::departman_yonlendir'i
+                # DOGRUDAN cagirarak bu skoru gorebilir, cevapla() burada yoksayar.
+                departman_id, _router_skoru = departman_yonlendir(retrieval_sorusu, tenant_id, soru_str, kullanici_id, rol, zamanlama, baglanti)
+                if departman_id is None:
+                    return YETERSIZ_KANIT_CEVABI, 0, None, []
 
-        # RAG V2 CHECKPOINT 2: final_baglam_sec, ROUTED departman icindeki
-        # yetkilendirme predikatini (final_adaylari_getir icinde, DEGISMEDI)
-        # HER ZAMAN reranker'dan ONCE uygular, sonra authorized dense top-
-        # FINAL_ADAY_TOP_K'yi reranker ile yeniden siralayip ilk FINAL_BAGLAM_K
-        # parcayi NIHAI KANIT olarak dondurur (bkz. final_baglam_sec docstring'i
-        # - "PROVENANCE - CRITICAL" notu). ESIK ARTIK burada KARSILASTIRILMAZ.
-        final_kanit, dense_top_skor = final_baglam_sec(retrieval_sorusu, tenant_id, departman_id, soru_str, kullanici_id, rol, zamanlama)
+            # RAG V2 CHECKPOINT 2: final_baglam_sec, ROUTED departman icindeki
+            # yetkilendirme predikatini (final_adaylari_getir icinde, DEGISMEDI)
+            # HER ZAMAN reranker'dan ONCE uygular, sonra authorized dense top-
+            # FINAL_ADAY_TOP_K'yi reranker ile yeniden siralayip ilk FINAL_BAGLAM_K
+            # parcayi NIHAI KANIT olarak dondurur (bkz. final_baglam_sec docstring'i
+            # - "PROVENANCE - CRITICAL" notu). ESIK ARTIK burada KARSILASTIRILMAZ.
+            final_kanit, dense_top_skor = final_baglam_sec(retrieval_sorusu, tenant_id, departman_id, soru_str, kullanici_id, rol, zamanlama, baglanti)
+        finally:
+            baglanti.close()
 
         if not final_kanit:
             # Routed departmanda HICBIR yetkili aday yok - guvenli "bilgi yok"
