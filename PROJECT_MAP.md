@@ -21,6 +21,7 @@ Kısa referans — tam mimari için kod tabanının kendisine bakılmalı, bu sa
 | `kullanici_departmanlari` | `kullanici_id` bigint, `departman_id` bigint, `olusturma_tarihi`, PK(`kullanici_id`,`departman_id`) | FK `kullanici_id→kullanicilar.id` ON DELETE CASCADE, FK `departman_id→departmanlar.id` ON DELETE CASCADE |
 | `sohbetler` | `id` bigint PK, `tenant_id`, `eposta`, `baslik` | — |
 | `mesajlar` | `id` bigint PK, `sohbet_id`, `rol`, `metin`, `skor` (nullable) | FK `sohbet_id→sohbetler.id` ON DELETE CASCADE |
+| `mesaj_kaynaklari` | `mesaj_id` bigint, `belge_id` bigint, `olusturma_tarihi`, PK(`mesaj_id`,`belge_id`) | FK `mesaj_id→mesajlar.id` ON DELETE CASCADE, FK `belge_id→belgeler.id` ON DELETE CASCADE |
 
 `vektor` üzerinde ANN indeksi yok (brute-force `<=>` taraması) — küçük veri hacminde sorun değil.
 
@@ -95,3 +96,11 @@ Yukarıdaki departman mimarisi ve erişim kontrolü temeli üzerine, Supabase SQ
 - **Salt-okunur "Departman Yetkilerim"** (`arayuz/Pages/Yetkilerim.cshtml(.cs)`, normal `kullanici`'ye özel nav girişi): kullanıcı sadece kendi açık departman üyeliklerini görür, hiçbir mutasyon kontrolü YOK. Şirket geneli erişim AÇIKLAYICI bir not olarak gösterilir, bireysel bir izinmiş gibi SUNULMAZ. `yonetici` bu sayfaya nav linki almaz (rol zaten üyelikten bağımsız erişime sahip); sayfa doğrudan URL ile ziyaret edilirse güvenli, salt-bilgilendirici bir mesaj gösterir.
 
 **Runtime doğrulandı:** erişim-kontrolü izin/red matrisi (`sirket`/`departman`/`NULL` × `kullanici`/`yonetici` × üyelikli/üyeliksiz), güvenli routing (`?departmanId=` ile cross-tenant/geçersiz id fail-safe), güvenli belge listeleme/açma (`BelgeIndir` id tahminiyle atlanamıyor), izin verme/kaldırma (cross-tenant çift hiçbir satırı etkilemiyor), belge metadata değişikliği (`belgeler`+`parcalar` atomik senkron), departman CRUD güvenliği (silme FK koruması, cross-tenant id'ler hiçbir işlemi etkilemiyor).
+
+## RAG Kaynak İzlenebilirliği (Source / Provenance) — P1: DB temeli
+
+`migrations/003_mesaj_kaynaklari.sql` — sadece SEMA, henüz hiçbir uygulama kodu (`sorgu.py`/`servis.py`/`Index.cshtml(.cs)`) bu tabloyu KULLANMIYOR.
+
+- `mesaj_kaynaklari` (`mesaj_id`, `belge_id`, PK ikili) — bir asistan mesajına RAG bağlamında hangi belge(ler)in sağlandığını tutar, çok-çok. FK `mesaj_id→mesajlar.id` ve `belge_id→belgeler.id` ikisi de ON DELETE CASCADE — bir mesaj silinince kaynak satırları, bir belge silinince o belgeye ait kaynak satırları otomatik temizlenir (silinen belge geçmiş provenance'da "donuk isim/stale link" olarak KALMAZ).
+- **Bilinçli tasarım kararı:** `dosya_adi`/`dosya_yolu` burada TUTULMAZ, sadece `belge_id` ilişkisi saklanır. Kullanıcının departman üyeliği sohbetten SONRA değişebileceği için, dosya adı "donuk" bir kopya olarak saklansaydı eski bir sohbet açıldığında kullanıcı ARTIK erişimi olmayan bir belgenin adını görebilirdi. Bunun yerine dosya adı/erişilebilirlik HER RENDER'DA GÜNCEL yetkilendirme kurallarıyla (bkz. yukarıdaki "Erişim kontrolü") çözülecek — erişim sonradan iptal edilmişse kaynak o an gösterilmeyecek.
+- Mevcut mesajlar için backfill YAPILMADI — eski cevaplar sıfır kaynak satırına sahip. Uygulama entegrasyonu (yazma/render/yetkilendirme sorgusu) HENÜZ yapılmadı, ayrı bir adımda gelecek.
