@@ -42,16 +42,41 @@ public class IndexModel : PageModel
 
     public string? Hata { get; set; }
 
-    public record Mesaj(string Rol, string Metin, double? Skor);
+    // belge_id/dosya_adi: hem FastAPI'nin /sor yanitindaki "kaynaklar"
+    // dizisiyle (bkz. SorguYaniti) HEM mesaj gecmisi yeniden yuklenirken
+    // (bkz. MesajlariYukle) AYNI sekle - Python tarafiyla birebir ayni alan
+    // adlari, ekstra JSON eslestirme secenegi GEREKMEZ.
+    public record Kaynak(long belge_id, string? dosya_adi);
+
+    public record Mesaj(string Rol, string Metin, double? Skor, List<Kaynak> Kaynaklar);
     public List<Mesaj> Mesajlar { get; set; } = new();
 
     public record Departman(long Id, string Ad);
     public List<Departman> Departmanlar { get; set; } = new();
 
-    public void OnGet()
+    public IActionResult OnGet()
     {
         DepartmanlariYukle();
-        MesajlariYukle();
+
+        if (SohbetId != null)
+        {
+            // "kullanici_id" claim'i SADECE C1'de eklendi - MesajlariYukle
+            // artik GUNCEL yetkilendirmeyi uygulamak icin bu kimlige
+            // ihtiyac duyuyor (bkz. asagisi). Taze/bos sohbet (SohbetId ==
+            // null) icin bu kontrole HIC gerek yok - sadece GECMIS acilirken
+            // zorlanir, OnPostAsync'teki AYNI desen.
+            var kullaniciIdClaim = User.FindFirst("kullanici_id");
+            if (kullaniciIdClaim == null)
+            {
+                return RedirectToPage("/Cikis");
+            }
+            var kullaniciId = long.Parse(kullaniciIdClaim.Value);
+            var rol = User.FindFirst(ClaimTypes.Role)!.Value;
+
+            MesajlariYukle(kullaniciId, rol);
+        }
+
+        return Page();
     }
 
     // Sag-ust departman secicisini doldurur - GET'te ve POST'ta (basarili/
@@ -104,15 +129,48 @@ public class IndexModel : PageModel
         return Departmanlar.FirstOrDefault(d => d.Id == etiketliId.Value)?.Ad ?? "Genel Asistan";
     }
 
-    private void MesajlariYukle()
+    private void MesajlariYukle(long kullaniciId, string rol)
     {
         if (SohbetId == null) return;
 
         var tenant = User.FindFirst("tenant_id")!.Value;
         var eposta = User.Identity!.Name;
 
+        // Kaynaklar KALICI bir "o an neydi" kopyasi DEGIL - mesaj_kaynaklari
+        // sadece mesaj<->belge ILISKISINI tutar (bkz. migrations/003), dosya
+        // adi/gorunurluk HER render'da GUNCEL yetkilendirme kurallariyla
+        // (Belgeler/BelgeIndir'deki AYNI predikat) burada, TEK sorguda
+        // yeniden cozulur - N+1 YOK, korelasyonlu alt sorgu her mesaj satiri
+        // icin ayri bir .NET->DB gidis-donusu GEREKTIRMEZ. Uyelik sonradan
+        // iptal edilirse bu kaynak bir daha DONMEZ; geri verilirse iliski
+        // hala var oldugu icin tekrar GORUNUR.
         const string SQL = @"
-            select m.rol, m.metin, m.skor from mesajlar m
+            select m.id,
+                   m.rol,
+                   m.metin,
+                   m.skor,
+                   coalesce((
+                       select json_agg(json_build_object('belge_id', b.id, 'dosya_adi', b.dosya_adi) order by mk.belge_id)
+                       from mesaj_kaynaklari mk
+                       join belgeler b on b.id = mk.belge_id
+                       where mk.mesaj_id = m.id
+                         and b.tenant_id = @t
+                         and (
+                             b.erisim_seviyesi = 'sirket'
+                             or (
+                                 b.erisim_seviyesi = 'departman'
+                                 and b.departman_id is not null
+                                 and (
+                                     @rol = 'yonetici'
+                                     or exists (
+                                         select 1 from kullanici_departmanlari kd
+                                         where kd.kullanici_id = @kid and kd.departman_id = b.departman_id
+                                     )
+                                 )
+                             )
+                         )
+                   ), '[]') as kaynaklar_json
+            from mesajlar m
             join sohbetler s on s.id = m.sohbet_id
             where m.sohbet_id = @s and s.tenant_id = @t and s.eposta = @e
             order by m.id";
@@ -122,14 +180,20 @@ public class IndexModel : PageModel
         komut.Parameters.AddWithValue("s", SohbetId.Value);
         komut.Parameters.AddWithValue("t", tenant);
         komut.Parameters.AddWithValue("e", eposta!);
+        komut.Parameters.AddWithValue("rol", rol);
+        komut.Parameters.AddWithValue("kid", kullaniciId);
 
         using var okuyucu = komut.ExecuteReader();
         while (okuyucu.Read())
         {
+            var kaynaklarJson = okuyucu.GetString(4);
+            var kaynaklar = JsonSerializer.Deserialize<List<Kaynak>>(kaynaklarJson) ?? new();
+
             Mesajlar.Add(new Mesaj(
-                okuyucu.GetString(0),
                 okuyucu.GetString(1),
-                okuyucu.IsDBNull(2) ? null : okuyucu.GetDouble(2)
+                okuyucu.GetString(2),
+                okuyucu.IsDBNull(3) ? null : okuyucu.GetDouble(3),
+                kaynaklar
             ));
         }
     }
@@ -269,13 +333,48 @@ public class IndexModel : PageModel
             komut.ExecuteNonQuery();
         }
 
-        using (var komut = new NpgsqlCommand(SQL_MESAJ, baglanti))
+        // Cevap mesaji + kaynak iliskileri AYNI transaction icinde: biri
+        // basarisiz olursa digeri de geri alinir, mesaj asla kaynaksiz-yarim
+        // bir durumda KALMAZ (bkz. gorev talimati "atomic where practical").
+        using (var islem = baglanti.BeginTransaction())
         {
-            komut.Parameters.AddWithValue("s", SohbetId.Value);
-            komut.Parameters.AddWithValue("r", "cevap");
-            komut.Parameters.AddWithValue("m", Cevap);
-            komut.Parameters.AddWithValue("sk", (object?)sonuc?.skor ?? DBNull.Value);
-            komut.ExecuteNonQuery();
+            long cevapMesajId;
+            const string SQL_MESAJ_CEVAP = "insert into mesajlar (sohbet_id, rol, metin, skor) values (@s, @r, @m, @sk) returning id";
+
+            using (var komut = new NpgsqlCommand(SQL_MESAJ_CEVAP, baglanti, islem))
+            {
+                komut.Parameters.AddWithValue("s", SohbetId.Value);
+                komut.Parameters.AddWithValue("r", "cevap");
+                komut.Parameters.AddWithValue("m", Cevap);
+                komut.Parameters.AddWithValue("sk", (object?)sonuc?.skor ?? DBNull.Value);
+                cevapMesajId = (long)komut.ExecuteScalar()!;
+            }
+
+            // FastAPI'nin dondurdugu belge_id'lere DOGRUDAN guvenilmez -
+            // dosya_adi BURADA hic okunmaz/saklanmaz (bkz. Kaynak/gorev
+            // talimati), sadece belge_id'ler bu tenant'a GERCEKTEN ait
+            // belgeler.id'lerine karsilik geliyorsa iliskilendirilir (tek
+            // INSERT...SELECT, ayri bir "belge var mi" round trip'i YOK -
+            // Belgeler/BelgeDuzenle'deki AYNI "ownership'i sorgunun kendi
+            // WHERE'inde ispatla" deseni). Arada silinmis bir belge varsa o
+            // id icin satir uretilmez, hata da FIRLATMAZ.
+            var belgeIdler = sonuc?.kaynaklar?.Select(k => k.belge_id).Distinct().ToArray() ?? Array.Empty<long>();
+            if (belgeIdler.Length > 0)
+            {
+                const string SQL_KAYNAK = @"
+                    insert into mesaj_kaynaklari (mesaj_id, belge_id)
+                    select @mesajId, b.id
+                    from belgeler b
+                    where b.tenant_id = @t and b.id = any(@belgeIdler)";
+
+                using var komut = new NpgsqlCommand(SQL_KAYNAK, baglanti, islem);
+                komut.Parameters.AddWithValue("mesajId", cevapMesajId);
+                komut.Parameters.AddWithValue("t", tenant);
+                komut.Parameters.AddWithValue("belgeIdler", belgeIdler);
+                komut.ExecuteNonQuery();
+            }
+
+            islem.Commit();
         }
 
         return RedirectToPage(new { sohbetId = SohbetId, departmanId = DepartmanId, sonKullanilanDepartmanId = SonKullanilanDepartmanId });
@@ -356,5 +455,12 @@ public class IndexModel : PageModel
         // tarafindan otomatik yonlendirilmis) - SADECE gorsel etiket icin
         // kullanilir, bkz. OnPostAsync/GosterilenDepartmanEtiketi.
         public long? departman_id { get; set; }
+
+        // sorgu.py::cevapla'nin LLM'e verdigi (zaten yetkilendirme-filtreli)
+        // parcalarin belgeleri (bkz. PROJECT_MAP.md "RAG Kaynak
+        // İzlenebilirliği"). dosya_adi burada PARSE edilebilir ama asla
+        // KALICI olarak saklanmaz/gecmis render'da guvenilmez - sadece
+        // belge_id kalici iliski icin kullanilir (bkz. OnPostAsync).
+        public List<Kaynak>? kaynaklar { get; set; }
     }
 }
