@@ -293,6 +293,30 @@
         overflow-wrap: anywhere;
     }
 
+    /* Kaynaklar satiri: cevap balonunun altinda kucuk, sessiz bir metadata
+       satiri - Bootstrap'in .small'undan (0.875em) daha kompakt, balon
+       metninden acikca daha kucuk. Linkler .text-muted'dan color: inherit
+       ile AYNI soluk tonu alir (varsayilan link mavisi "one cikmasin" diye)
+       - altcizgi tikanabilirligi belli eder, hover'da tam govde rengine
+       koyulasir. overflow-wrap balon-cevap ile AYNI gerekce: bosluksuz uzun
+       dosya adlari satiri yatay TASIRMASIN. */
+    .kaynaklar-satiri {
+        font-size: 0.75rem;
+        line-height: 1.4;
+        margin-top: 0.35rem;
+        overflow-wrap: anywhere;
+    }
+
+    .kaynaklar-satiri a {
+        color: inherit;
+        text-decoration: underline;
+        text-decoration-color: var(--bs-border-color);
+    }
+
+    .kaynaklar-satiri a:hover {
+        color: var(--bs-body-color);
+    }
+
     #selamlama {
         position: absolute;
         top: calc(50% - 100px);
@@ -746,7 +770,19 @@
                 else
                 {
                     <div class="d-flex justify-content-start mb-3 mesaj-satiri">
-                        <div class="alert mb-0 chat-balon balon-cevap" style="max-width:70%;">@m.Metin</div>
+                        <div style="max-width:70%; min-width:0;">
+                            <div class="alert mb-0 chat-balon balon-cevap">@m.Metin</div>
+                            @if (m.Kaynaklar.Count > 0)
+                            {
+                                <div class="text-muted kaynaklar-satiri">
+                                    Kaynaklar:
+                                    @for (var i = 0; i < m.Kaynaklar.Count; i++)
+                                    {
+                                        <a href="/BelgeIndir?id=@m.Kaynaklar[i].belge_id" target="_blank">@m.Kaynaklar[i].dosya_adi</a>@(i < m.Kaynaklar.Count - 1 ? ", " : "")
+                                    }
+                                </div>
+                            }
+                        </div>
                     </div>
                 }
             }
