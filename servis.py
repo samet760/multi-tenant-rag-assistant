@@ -1,9 +1,11 @@
 import os
 import tempfile
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sorgu import cevapla
 from indeksle import indeksle
+from llm import LLMServisHatasi
 app = FastAPI()
 
 # migrations/002_erisim_kontrolu.sql'deki CHECK ile AYNI kisitlama - .NET
@@ -58,9 +60,27 @@ def sor_endpoint(istek: SoruIstegi):
     # belgeleri - bkz. sorgu.py::cevapla. Ayri bir yetkilendirme sorgusu
     # BURADA calistirilmaz, cevapla'nin dondurdugu listeye DOKUNULMADAN
     # aktarilir.
-    cevap, skor, departman_id, kaynaklar = cevapla(
-        istek.soru, istek.tenant_id, istek.departman_id, istek.kullanici_id, istek.rol, istek.gecmis
-    )
+    #
+    # GUVENILIRLIK CHECKPOINT: SADECE tipli LLMServisHatasi (llm.py) burada
+    # yakalanir - saglayici (OpenRouter) hatasi ARTIK asla sahte bir HTTP
+    # 200 "basarili cevap" olarak DISARI cikmaz, gercek/anlamli bir HTTP
+    # durumuyla (401/402/429/502/503/504) KUCUK, guvenli bir JSON govde
+    # doner - HAM saglayici govdesi/stack trace BURADA HICBIR ZAMAN
+    # govdeye YAZILMAZ (bkz. gorev talimati "Do NOT convert known provider
+    # failures into HTTP 200"). Retrieval/yetkilendirme/programlama gibi
+    # ILGISIZ bir hata BURADA YAKALANMAZ - baska HERHANGI bir exception
+    # (bkz. gorev talimati "Do NOT catch and silently hide unrelated
+    # programming errors") normal sekilde yukari firlar, FastAPI'nin
+    # KENDI varsayilan 500'une duser - bu davranis BILINCLI DEGISTIRILMEDI.
+    try:
+        cevap, skor, departman_id, kaynaklar = cevapla(
+            istek.soru, istek.tenant_id, istek.departman_id, istek.kullanici_id, istek.rol, istek.gecmis
+        )
+    except LLMServisHatasi as hata:
+        return JSONResponse(
+            status_code=hata.http_durum,
+            content={"hata": hata.kategori, "mesaj": hata.kullanici_mesaji},
+        )
     return {"cevap": cevap, "skor": skor, "departman_id": departman_id, "kaynaklar": kaynaklar}
 
 @app.post("/indeksle")

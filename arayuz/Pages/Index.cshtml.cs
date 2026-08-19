@@ -292,10 +292,30 @@ public class IndexModel : PageModel
 
             if (!yanit.IsSuccessStatusCode)
             {
-                // FastAPI 500/502 gibi basarisiz durum kodu dondurdu - govde
-                // "Internal Server Error" gibi duz metin olabilir, JSON
-                // deserialize HIC denenmez.
-                Cevap = "Yanıt oluşturulurken bir servis hatası oluştu. Lütfen tekrar deneyin.";
+                // GUVENILIRLIK CHECKPOINT: FastAPI /sor artik BILINEN saglayici
+                // hatalarinda (llm.py::LLMServisHatasi, bkz. servis.py::
+                // sor_endpoint) kucuk/guvenli bir JSON govde dondurur:
+                // {"hata": kategori, "mesaj": onceden-yazilmis guvenli Turkce
+                // cumle}. O govde BURADA ayristirilip "mesaj" alani GOSTERILIR -
+                // HAM govde/stack trace/beklenmeyen govde sekli (orn. programlama
+                // hatasindan gelen FastAPI'nin KENDI generic 500'u) KULLANICIYA
+                // ASLA gosterilmez, bu durumda mevcut genel dusme mesajina duser.
+                var hataGovdesiMetni = await yanit.Content.ReadAsStringAsync();
+                string? guvenliMesaj = null;
+                try
+                {
+                    var hataGovdesi = JsonSerializer.Deserialize<SorHatasiYaniti>(hataGovdesiMetni);
+                    guvenliMesaj = hataGovdesi?.mesaj;
+                }
+                catch (JsonException)
+                {
+                    // govde beklenen {"hata","mesaj"} seklinde DEGIL - asagidaki
+                    // genel mesaja duser, HAM govde ASLA gosterilmez.
+                }
+
+                Cevap = !string.IsNullOrWhiteSpace(guvenliMesaj)
+                    ? guvenliMesaj
+                    : "Yanıt oluşturulurken bir servis hatası oluştu. Lütfen tekrar deneyin.";
             }
             else
             {
@@ -328,6 +348,17 @@ public class IndexModel : PageModel
             // bir TaskCanceledException (orn. istemci baglantiyi kesti) burada YUTULMAZ,
             // filtreye takilmadigi icin normal sekilde yukari firlar.
             Cevap = "İstek zaman aşımına uğradı. Lütfen daha kısa veya daha net bir soru deneyin.";
+        }
+        catch (HttpRequestException)
+        {
+            // Yerel FastAPI sureci hic ULASILAMIYOR (calismiyor/baglanti
+            // reddedildi/DNS vs) - yukaridaki try, govde okuma noktasina bile
+            // ULASAMADI. Bu, onceki (!yanit.IsSuccessStatusCode) dalindan FARKLI
+            // bir durum (orada en azindan bir HTTP yaniti VARDI) - Razor handler
+            // burada CRASH etmeden, ayri/daha dogru bir kullanici mesajiyla
+            // (bkz. gorev talimati) yakalanir; istisna detayi KULLANICIYA
+            // gosterilmez.
+            Cevap = "Yanıt servisine şu anda ulaşılamıyor. Lütfen tekrar deneyin.";
         }
         fastApiKronometre.Stop();
 
@@ -503,5 +534,16 @@ public class IndexModel : PageModel
         // KALICI olarak saklanmaz/gecmis render'da guvenilmez - sadece
         // belge_id kalici iliski icin kullanilir (bkz. OnPostAsync).
         public List<Kaynak>? kaynaklar { get; set; }
+    }
+
+    // FastAPI /sor'un BILINEN saglayici hatasi (llm.py::LLMServisHatasi,
+    // bkz. servis.py::sor_endpoint) icin dondurdugu KUCUK govde sekli -
+    // Python tarafiyla alan alan AYNI (hata/mesaj), ekstra esleme GEREKMEZ.
+    // "mesaj" DISINDA hicbir alan KULLANILMAZ/GOSTERILMEZ - ham saglayici
+    // govdesi zaten bu sekle HIC GIRMEZ (bkz. llm.py::LLMServisHatasi).
+    public class SorHatasiYaniti
+    {
+        public string? hata { get; set; }
+        public string? mesaj { get; set; }
     }
 }

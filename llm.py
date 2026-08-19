@@ -8,6 +8,34 @@ ANAHTAR = os.getenv("OPENROUTER_API_KEY")
 MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 URL = "https://openrouter.ai/api/v1/chat/completions"
 
+
+class LLMServisHatasi(Exception):
+    """RAG V2 GUVENILIRLIK CHECKPOINT: saglayici (OpenRouter) hatasini
+    normal bir cevap METNINDEN AYRISTIRAN tipli istisna - onceki denetimde
+    bulunan ana kusuru (saglayici hatasi "[HATA 429] ..." gibi duz bir
+    METIN olarak donup sorgu.py::cevapla tarafindan NORMAL, KAYNAKLI bir
+    cevap gibi ele alinmasi) giderir. SADECE GUVENLI/kucuk metadata tasir -
+    HAM saglayici govdesi/stack trace/prompt/soru/parca metni/API anahtari
+    BURADA HICBIR ZAMAN saklanmaz (bkz. gorev talimati "Do NOT carry or
+    expose raw API response bodies unnecessarily").
+
+    kategori: kisa, sabit bir metin etiketi (orn. "kota", "yogunluk") -
+    servis.py'nin FastAPI govdesine AYNEN yazdigi deger.
+    http_durum: FastAPI'nin /sor uzerinden DISARI verecegi HTTP durumu.
+    kullanici_mesaji: UI'da GOSTERILECEK, tamamen guvenli/onceden yazilmis
+    Turkce cumle - saglayicinin HAM metnini ASLA icermez.
+    ust_durum: OpenRouter'in kendi HTTP durumu (varsa) - SADECE sunucu
+    tarafi tanı loguna yazilir (bkz. _hata_logla), kullaniciya asla
+    gosterilmez."""
+
+    def __init__(self, kategori, http_durum, kullanici_mesaji, ust_durum=None):
+        self.kategori = kategori
+        self.http_durum = http_durum
+        self.kullanici_mesaji = kullanici_mesaji
+        self.ust_durum = ust_durum
+        super().__init__(f"LLMServisHatasi: kategori={kategori} ust_durum={ust_durum}")
+
+
 # Deterministik "yetersiz kanit" sozlesmesi - sorgu.py::cevapla ile
 # PAYLASILIR (bkz. gorev talimati "Use a deterministic contract... one or
 # more canonical exact refusal responses/constants"). SISTEM promptu
@@ -115,6 +143,53 @@ BAGLAMSALLASTIRMA_SISTEM = (
 )
 
 
+def _saglayici_hatasi(ust_durum):
+    """OpenRouter'in HTTP durum kodunu (varsa - agdaki bir hata icin None
+    olabilir) GUVENLI, sabit bir LLMServisHatasi kategorisine esler. HAM
+    saglayici govdesi/metni BURADA HICBIR YERE tasinmaz - SADECE sayisal
+    durum kodu okunur (bkz. gorev talimati "Do NOT expose ... full
+    OpenRouter error bodies"). Listelenmemis/beklenmeyen HER durum (400,
+    500, veya baska herhangi biri) GENEL "gecersiz_yanit" kovasina duser -
+    "internal'i ifsa etme" kurali BOYLECE otomatik saglanir, yeni bir
+    durum kodu icin ozel kod YAZILMASI GEREKMEZ."""
+    if ust_durum == 401:
+        return LLMServisHatasi("kimlik_dogrulama", 401,
+                                "AI servisi kimlik doğrulama hatası verdi.", ust_durum)
+    if ust_durum == 402:
+        return LLMServisHatasi("kota", 402,
+                                "AI servis kullanım limiti doldu. Lütfen daha sonra tekrar deneyin.", ust_durum)
+    if ust_durum == 429:
+        return LLMServisHatasi("yogunluk", 429,
+                                "AI servisi şu anda yoğun. Lütfen kısa süre sonra tekrar deneyin.", ust_durum)
+    if ust_durum in (502, 503):
+        return LLMServisHatasi("saglayici_erisilemez", ust_durum,
+                                "AI servisine geçici olarak ulaşılamıyor. Lütfen tekrar deneyin.", ust_durum)
+    if ust_durum == 504:
+        return LLMServisHatasi("zaman_asimi", 504,
+                                "AI servisi yanıt vermekte gecikti. Lütfen tekrar deneyin.", ust_durum)
+    # 200 (choices eksik/bozuk), 400, 500, veya baska her sey - hicbiri
+    # kullanicinin YAPABILECEGI/BILMESI GEREKEN bir sey degil, o yuzden TEK
+    # bir genel "gecersiz yanit" mesajina duser (bkz. gorev talimati
+    # "Unexpected failures should not expose internals").
+    return LLMServisHatasi("gecersiz_yanit", 502,
+                            "AI servisinden geçerli bir yanıt alınamadı. Lütfen tekrar deneyin.", ust_durum)
+
+
+def _hata_logla(asama, hata):
+    """GUVENLI, tek-satirlik sunucu-tarafi tani logu - SADECE genis
+    kategori/hedef HTTP durumu/saglayicinin KENDI HTTP durumu/asama adi
+    (bkz. gorev talimati "Allowed: broad category, upstream status,
+    stage"). API anahtari/HAM saglayici govdesi/prompt/soru/parca metni/
+    baglanti dizesi BURADA HICBIR ZAMAN yazilmaz - LLMServisHatasi zaten
+    bunlari TASIMIYOR (bkz. sinif docstring'i), o yuzden burada YANLISLIKLA
+    da sizamaz. Ayri bir logging framework EKLENMEDI (bkz. gorev talimati
+    "Do not introduce a logging framework if current simple logging is
+    sufficient") - mevcut RAG_TIMING/CHAT_TIMING ile AYNI duz print()
+    deseni."""
+    print(f"[LLM_HATA] asama={asama} kategori={hata.kategori} "
+          f"http_durum={hata.http_durum} ust_durum={hata.ust_durum}")
+
+
 def _openrouter_tamamla(sistem_metni, kullanici_metni, max_tokens):
     """OpenRouter'a TEK bir sohbet-tamamlama istegi atan KUCUK paylasilan
     yardimci - sor() VE baglamsallastir() arasinda PAYLASILAN tek HTTP/
@@ -122,41 +197,86 @@ def _openrouter_tamamla(sistem_metni, kullanici_metni, max_tokens):
     kullanilir - yeni bir saglayici/bagimlilik EKLENMEDI (bkz. gorev
     talimati "Prefer reusing the CURRENT LLM/provider infrastructure").
 
-    DONER: (icerik, hata_metni). Basarili olursa icerik dolu/hata_metni
-    None; saglayici gecerli bir "choices" dondurmezse icerik None/hata_metni
-    kisa bir hata aciklamasi olur - cagiran BUNU KENDI dusme davranisina
-    gore ele alir (sor() dogrudan hata metnini dondurur, baglamsallastir()
-    ise guvenli sekilde ORIJINAL soruya duser)."""
-    yanit = requests.post(
-        URL,
-        headers={
-            "Authorization": f"Bearer {ANAHTAR}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": MODEL,
-            "messages": [
-                {"role": "system", "content": sistem_metni},
-                {"role": "user", "content": kullanici_metni},
-            ],
-            "temperature": 0,
-            "max_tokens": max_tokens,
-            "reasoning": {"enabled": False},
-        },
-    )
+    BASARILI olursa (HTTP 2xx + gecerli JSON + kullanilabilir "choices")
+    cevap METNINI DOGRUDAN dondurur - onceki davranisla AYNI. BASARISIZ
+    olursa (non-2xx, 2xx ama choices eksik/bozuk, JSON-olmayan govde,
+    istek zaman asimi, aglati/baglanti hatasi) ARTIK bir metin DEGIL,
+    LLMServisHatasi FIRLATIR - cagiran (sor()/baglamsallastir()) bunu
+    KENDI dusme davranisina gore ele alir. Onceki "duz metin hata dondur"
+    deseni TAMAMEN KALDIRILDI - bir saglayici hatasi artik hicbir sekilde
+    normal bir cevap METNIYLE KARISTIRILAMAZ (bkz. gorev talimati "must
+    NEVER become cevap / be treated as grounded output").
 
-    veri = yanit.json()
+    GUVENILIRLIK CHECKPOINT-SONRASI DUZELTME: bu istek BILINCLI olarak
+    HALA bir timeout= parametresi TASIMIYOR (bkz. gorev talimati "Restore
+    the previous requests.post timeout behavior only" - mevcut model daha
+    yavas ureteflerde 30 saniyeye yakin surebiliyor, bu checkpoint zaman
+    asimi DAVRANISINI degistirmeye YONELIK degildi). requests.exceptions.
+    Timeout yakalamasi ASAGIDA yine de KALIR (siniflandirma/LLMServisHatasi
+    sozlesmesi geri ALINMADI) - SADECE artik bu kod yolunu TETIKLEYECEK
+    yerel bir sure siniri YOK; saglayici GERCEKTEN hic yanit vermezse istek
+    (onceki davranisla AYNI sekilde) sinirsiz surebilir."""
+    try:
+        yanit = requests.post(
+            URL,
+            headers={
+                "Authorization": f"Bearer {ANAHTAR}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": MODEL,
+                "messages": [
+                    {"role": "system", "content": sistem_metni},
+                    {"role": "user", "content": kullanici_metni},
+                ],
+                "temperature": 0,
+                "max_tokens": max_tokens,
+                "reasoning": {"enabled": False},
+            },
+        )
+    except requests.exceptions.Timeout:
+        raise LLMServisHatasi("zaman_asimi", 504,
+                               "AI servisi yanıt vermekte gecikti. Lütfen tekrar deneyin.")
+    except requests.exceptions.RequestException:
+        # DNS/baglanti reddedildi/TLS/vs - saglayiciya HIC ulasilamadi, bu
+        # yuzden ust_durum YOK (None) - sadece agdaki bir sorun oldugu
+        # BILINIR, saglayicinin KENDI durum kodu hicbir zaman ALINAMADI.
+        raise LLMServisHatasi("saglayici_erisilemez", 503,
+                               "AI servisine geçici olarak ulaşılamıyor. Lütfen tekrar deneyin.")
 
-    if "choices" not in veri:
-        return None, f"[HATA {yanit.status_code}] {yanit.text[:200]}"
+    try:
+        veri = yanit.json()
+    except ValueError:
+        # Govde JSON DEGIL (orn. bir ara proxy'den duz metin/HTML 502) -
+        # durum kodu YINE DE gecerli (HTTP yaniti GELDI, sadece govdesi
+        # ayristirilamadi) - ayni durum-koduna-gore-esleme kullanilir,
+        # generic bir JSONDecodeError cagirana ASLA SIZMAZ.
+        raise _saglayici_hatasi(yanit.status_code)
 
-    return veri["choices"][0]["message"]["content"], None
+    if yanit.status_code // 100 == 2 and "choices" in veri:
+        try:
+            return veri["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError):
+            # 2xx ama "choices" bos/beklenmeyen sekilde - BASARI DEGIL,
+            # asagidaki AYNI genel eslemeye duser.
+            pass
+
+    raise _saglayici_hatasi(yanit.status_code)
 
 
 def sor(soru, parcalar):
     kullanici = "BAGLAM:\n" + "\n\n".join(parcalar) + "\n\nSORU: " + soru
-    icerik, hata = _openrouter_tamamla(SISTEM, kullanici, 1000)
-    return icerik if icerik is not None else hata
+    try:
+        return _openrouter_tamamla(SISTEM, kullanici, 1000)
+    except LLMServisHatasi as hata:
+        # Nihai KANITLI cevap asamasi - bir saglayici hatasi burada ASLA
+        # yutulmaz/normal bir cevap metnine DONUSTURULMEZ, SADECE tani
+        # icin GUVENLI sekilde loglanir ve OLDUGU GIBI yukari (sorgu.py::
+        # cevapla -> servis.py sinirina) firlatilmaya devam eder (bkz.
+        # gorev talimati "Let the typed exception propagate through
+        # sorgu.py::cevapla() to the FastAPI boundary").
+        _hata_logla("answer", hata)
+        raise
 
 
 def baglamsallastir(soru, gecmis):
@@ -182,8 +302,15 @@ def baglamsallastir(soru, gecmis):
 
     kullanici = "\n".join(baglam_satirlari) + f"\n\nSU ANKI SORU: {soru}"
 
-    icerik, hata = _openrouter_tamamla(BAGLAMSALLASTIRMA_SISTEM, kullanici, 120)
-    if hata is not None:
+    try:
+        icerik = _openrouter_tamamla(BAGLAMSALLASTIRMA_SISTEM, kullanici, 120)
+    except LLMServisHatasi as hata:
+        # Bu asamanin GUVENLI dusme davranisi DEGISMEDI (bkz. gorev
+        # talimati "Do NOT change ... contextualization semantics") -
+        # SADECE onceki (icerik, hata) ikilisi yerine artik bir istisna
+        # YAKALANIYOR; sonuc AYNI: soru DEGISTIRILMEDEN doner, hata
+        # yukari asla firlatilmaz. Tek eklenen sey guvenli tani logu.
+        _hata_logla("contextualize", hata)
         return soru
 
     yeniden_yazilan = icerik.strip()
