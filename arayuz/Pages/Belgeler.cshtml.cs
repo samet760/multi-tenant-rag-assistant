@@ -179,9 +179,23 @@ public class BelgelerModel : PageModel
         }
     }
 
-    [Authorize(Roles = "yonetici")]
+    // MVC1001: [Authorize] handler-level'de Razor Pages tarafindan
+    // UYGULANMAZ (bkz. dotnet build uyarisi) - sinif SADECE [Authorize]
+    // (herhangi bir authenticated kullanici) tasidigi icin bu kontrol
+    // olmadan normal bir "kullanici" da bu handler'i DOGRUDAN POST ederek
+    // cagirabilirdi. O yuzden rol kontrolu burada, handler'in EN BASINDA,
+    // acikca yapilir - Program.cs'deki "Cerez" cookie semasinin
+    // AccessDeniedPath'i ("/Yetkisiz") Forbid() ile AYNI /Yetkisiz akisini
+    // tetikler (class-level [Authorize(Roles=...)] kullanan diger
+    // sayfalarla - Yukle/Logo/Departmanlar/Kullanicilar - BIREBIR AYNI
+    // davranis).
     public IActionResult OnPostSil(long id, long? departmanId)
     {
+        if (!User.IsInRole("yonetici"))
+        {
+            return Forbid();
+        }
+
         var tenant = User.FindFirst("tenant_id")!.Value;
 
         using var baglanti = Db.Baglan();
