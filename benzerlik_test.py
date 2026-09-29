@@ -5,7 +5,7 @@ from embed import model
 
 load_dotenv()
 URL = os.getenv("SUPABASE_DB_URL")
-TENANT = "english-home"
+TENANT = "ornek-firma"
 
 sorular = [
     "kasa sayımını kim yapar",

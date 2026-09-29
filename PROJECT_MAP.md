@@ -4,7 +4,7 @@ Kısa referans — tam mimari için kod tabanının kendisine bakılmalı, bu sa
 
 ## Tenant / auth akışı
 
-- `tenant_id` bir **text slug** (`"english-home"`, `"test-firma"`), `tenantlar.id`. Numeric surrogate değil.
+- `tenant_id` bir **text slug** (`"ornek-firma"`, `"test-firma"`), `tenantlar.id`. Numeric surrogate değil.
 - Login: `arayuz/Pages/Giris.cshtml.cs` → `kullanicilar` + `tenantlar` join → `tenant_id`, `rol`, `firma_adi`, `logo_url`, **`kullanici_id`** cookie claim'lerine yazılır (`"Cerez"` şeması). `kullanici_id` = `kullanicilar.id`, sadece DB'den doğrulanmış login satırından gelir (bkz. "Erişim kontrolü" bölümü).
 - Her sayfa `User.FindFirst("tenant_id")!.Value` ile okur. Roller: `kullanici`, `yonetici` (`[Authorize(Roles="yonetici")]`).
 - Python tarafının kendi auth mekanizması YOK — `.NET`'in her isteğe eklediği `tenant_id`/`kullanici_id`/`rol` parametrelerine güvenir (iç ağ, 127.0.0.1); bu güven `/sor` için artık sadece `tenant_id` ile sınırlı değil, RAG yetkilendirmesinin de temeli (bkz. "Erişim kontrolü").
@@ -66,7 +66,7 @@ Merkezi bir RLS/middleware YOK. Her yeni sorguda `where tenant_id = @t` (veya Py
 
 Adım A–E tamamlandı: DB temeli, upload'da departman seçimi, departman-filtreli retrieval, sohbette manuel departman seçici, Genel Asistan otomatik yönlendirme.
 
-- `departmanlar` tablosu var (`tenant_id`, `ad`, UNIQUE(`tenant_id`,`ad`)). English Home için 4 departman seed edildi (bkz. `migrations/001_departmanlar.sql`).
+- `departmanlar` tablosu var (`tenant_id`, `ad`, UNIQUE(`tenant_id`,`ad`)). Örnek tenant için 4 departman seed edildi (bkz. `migrations/001_departmanlar.sql`).
 - `belgeler.departman_id` ve `parcalar.departman_id` nullable, `parcalar.departman_id` `tenant_id` ile aynı gerekçeyle FK'siz denormalize. Mevcut eski satırlar `departman_id = NULL` kaldı, backfill yapılmadı.
 - Upload (`Yukle.cshtml(.cs)`) departmanı zorunlu kılar, sahiplik sunucu tarafında doğrulanır, `indeksle.py` her iki tabloya da yazar.
 - Sohbet (`Index.cshtml(.cs)`) sağ-üstte tenant'a özel bir departman seçici gösterir; seçim composer'ın gizli alanına senkronlanıp `/sor`'a `departman_id` olarak gider.

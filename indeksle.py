@@ -36,7 +36,7 @@ def indeksle(tenant, pdf_yolu, dosya_adi, departman_id=None, erisim_seviyesi=Non
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tenant", default="english-home")
+    parser.add_argument("--tenant", default="ornek-firma")
     parser.add_argument("--pdf", default="data/kurallar.pdf")
     parser.add_argument("--departman-id", type=int, default=None)
     args = parser.parse_args()

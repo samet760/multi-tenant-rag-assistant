@@ -12,7 +12,7 @@
 -- 1) departmanlar: her tenant'in kendi departman listesi.
 --    id: projedeki diger tum tablolarla (sohbetler, mesajlar, belgeler,
 --    parcalar) AYNI desen (bigserial) - tenantlar.id (text slug, orn.
---    "english-home") ile KARISTIRILMASIN; departmanlar admin tarafindan
+--    "ornek-firma") ile KARISTIRILMASIN; departmanlar admin tarafindan
 --    CRUD edilecek normal satirlar, tenant'in kendisi degil.
 create table if not exists departmanlar (
     id bigserial primary key,
@@ -35,15 +35,15 @@ alter table belgeler
 alter table parcalar
     add column if not exists departman_id bigint;
 
--- 4) English Home tenant'i icin baslangic departmanlari. Idempotent:
+-- 4) Ornek tenant icin baslangic departmanlari. Idempotent:
 --    UNIQUE(tenant_id, ad) constraint'i uzerinden ON CONFLICT DO NOTHING -
 --    script tekrar calistirilirsa yeni satir eklenmez.
 --    "Genel Asistan" BURADA YOK - bu bir departman degil, ileride ayri bir
 --    yonlendirme modu olacak (bkz. PROJECT_MAP.md). Bu dort isim uygulama
 --    kodunda hardcode EDILMEYECEK - sadece bu tenant icin baslangic verisi.
 insert into departmanlar (tenant_id, ad) values
-    ('english-home', 'Mağaza Operasyonları'),
-    ('english-home', 'İnsan Kaynakları'),
-    ('english-home', 'IT Destek'),
-    ('english-home', 'Ürün & Lojistik')
+    ('ornek-firma', 'Mağaza Operasyonları'),
+    ('ornek-firma', 'İnsan Kaynakları'),
+    ('ornek-firma', 'IT Destek'),
+    ('ornek-firma', 'Ürün & Lojistik')
 on conflict (tenant_id, ad) do nothing;

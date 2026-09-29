@@ -305,7 +305,7 @@ def yazdir(sonuc: KKarsilastirmaSonucu, detay: bool = False) -> None:
 # Hicbir sirket gercegi UYDURULMADI. Magaza Operasyonlari (departman_id=1) ve
 # Urun & Lojistik (departman_id=4) parcalari 'sirket' erisim_seviyesi ile
 # authorized/retrieved - icerikleri bu dosyayi hazirlarken DB'den okundu
-# (ENGLISH HOME MAGAZA CALISMA YONETMELIGI + urun_lojjistik_test.pdf).
+# (magaza calisma yonetmeligi + urun_lojjistik_test.pdf).
 # BULGU (uydurulmadi, DB'den dogrulandi): IT Destek (departman_id=3, 332
 # parca) parcalarinin erisim_seviyesi kolonu NULL - sorgu.py'nin WHERE
 # predikati ('sirket' VEYA 'departman') NULL ile HICBIR ZAMAN eslesmez, o
@@ -323,7 +323,7 @@ SORU_SETI = [
      "K kesimi bu parcayi havuzdan TAMAMEN dusurebilir."),
     ("mağaza saat kacta acilir", "Magaza Operasyonlari / paraphrase", None),
     ("Hasarlı koli gelirse ne yapmamız gerekiyor?", "Urun & Lojistik", None),
-    ("Mars'taki English Home mağazası saat kaçta açılıyor?",
+    ("Mars'taki mağazamız saat kaçta açılıyor?",
      "Desteklenmeyen nitelik",
      "Dogru davranis 'yeterli kanit yok' (LLM cagrisi burada YAPILMAZ - "
      "sadece kanit kumesi karsilastirilir)."),

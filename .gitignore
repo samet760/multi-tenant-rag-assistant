@@ -6,3 +6,6 @@ __pycache__/
 bin/
 obj/
 arayuz/belge-deposu/
+
+# Tenant logolari (kullanici yuklemesi)
+arayuz/wwwroot/logolar/

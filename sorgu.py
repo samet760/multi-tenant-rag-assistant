@@ -543,5 +543,5 @@ def cevapla(soru, tenant_id, departman_id=None, kullanici_id=None, rol=None, gec
 
 
 if __name__ == "__main__":
-    cevap, skor, departman_id, kaynaklar = cevapla("kasa sayımını kim yapar", "english-home")
+    cevap, skor, departman_id, kaynaklar = cevapla("kasa sayımını kim yapar", "ornek-firma")
     print(skor, departman_id, kaynaklar, cevap)

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Multi-tenant RAG (retrieval-augmented generation) chatbot. Companies upload PDF policy/rule documents; employees ask questions in Turkish and get answers grounded strictly in the uploaded documents. Everything is `tenant_id`-scoped — this was generalized from a single-company tool (originally "English Home"), so no code should assume a single tenant.
+Multi-tenant RAG (retrieval-augmented generation) chatbot. Companies upload PDF policy/rule documents; employees ask questions in Turkish and get answers grounded strictly in the uploaded documents. Everything is `tenant_id`-scoped — this was generalized from a single-company tool, so no code should assume a single tenant.
 
 The codebase and all identifiers (variable/function/table names, UI text) are in **Turkish**. Keep new code consistent with this — don't switch to English names in Python/C# identifiers.
 
@@ -31,7 +31,7 @@ python cevap_test.py        # runs a fixed list of Q/A pairs through cevapla(), 
 python benzerlik_test.py    # prints top-3 similarity scores per test question, for tuning ESIK (the retrieval threshold)
 python db_test.py           # sanity-checks the DB connection and row count
 python tani.py               # sanity-checks that OPENROUTER_API_KEY loaded correctly
-python indeksle.py --tenant <id> --pdf <path>   # index a PDF from the CLI (defaults: tenant=english-home, data/kurallar.pdf)
+python indeksle.py --tenant <id> --pdf <path>   # index a PDF from the CLI (defaults: tenant=ornek-firma, data/kurallar.pdf)
 ```
 
 ### .NET frontend (`arayuz/`)
